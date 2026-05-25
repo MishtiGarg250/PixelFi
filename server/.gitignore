@@ -1,0 +1,61 @@
+# dependencies
+node_modules/
+
+# build output
+dist/
+build/
+
+# environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# runtime files
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# TypeScript
+*.tsbuildinfo
+
+# IDE/editor folders
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# coverage
+coverage/
+
+# temporary files
+tmp/
+temp/
+
+# Clerk
+.clerk/
+
+# uploads
+uploads/
+
+# cache
+.cache/
+
+# eslint cache
+.eslintcache
+
+# prettier cache
+.prettiercache
+/src/generated/prisma
