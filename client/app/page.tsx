@@ -8,6 +8,8 @@ import {
   BarChart3,
   Sparkles,
 } from "lucide-react";
+import Link from "next/link";
+import {Show,UserButton} from "@clerk/nextjs"
 
 export default function HomePage() {
   return (
@@ -46,13 +48,22 @@ export default function HomePage() {
           </div>
 
           <div className="flex items-center gap-3">
-            <button className="rounded-full px-4 py-1.5 text-xs font-medium text-neutral-400 transition-colors hover:text-white">
-              Login
-            </button>
-
-            <button className="rounded-full bg-linear-to-r from-[#b5b5f6] to-[#f7bff4] px-5 py-1.5 text-xs font-medium text-black transition-all duration-300 hover:scale-[1.03] hover:opacity-95 shadow-[0_0_25px_rgba(247,191,244,0.25)]">
-              Sign Up
-            </button>
+            <Show when="signed-out">
+              <Link href="/sign-in">
+              <button className="rounded-full px-4 py-1.5 text-xs font-medium text-neutral-400 transition-colors hover:text-white">
+                Login
+              </button>
+            </Link>
+            
+            <Link href="/sign-up">
+              <button className="rounded-full bg-linear-to-r from-[#b5b5f6] to-[#f7bff4] px-5 py-1.5 text-xs font-medium text-black transition-all duration-300 hover:scale-[1.03] hover:opacity-95 shadow-[0_0_25px_rgba(247,191,244,0.25)]">
+                Sign Up
+              </button>
+            </Link>
+            </Show>
+            <Show when="signed-in">
+              <UserButton  />
+            </Show>
           </div>
         </div>
       </nav>
