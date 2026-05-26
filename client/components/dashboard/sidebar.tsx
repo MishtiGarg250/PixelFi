@@ -9,8 +9,10 @@ import {
   ArrowLeftRight, 
   PieChart, 
   LineChart, 
-  Sparkles 
+  Settings,
+  Sparkles
 } from "lucide-react";
+import { label } from "framer-motion/client";
 
 const links = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
@@ -19,6 +21,8 @@ const links = [
   { label: "Transactions", href: "/dashboard/transactions", icon: ArrowLeftRight },
   { label: "Holdings", href: "/dashboard/holdings", icon: PieChart },
   { label: "Analytics", href: "/dashboard/analytics", icon: LineChart },
+  {label:"Market", href:"/dashboard/market", icon: LineChart},
+  {label: "Settings", href:"/dashboard/settings", icon: Settings}
 ];
 
 export const Sidebar = () => {
