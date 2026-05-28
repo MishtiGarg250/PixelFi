@@ -6,3 +6,5 @@ const router = express.Router();
 
 router.post('/', protect, createTransaction);
 router.get('/', protect, getUserTransactions);
+
+export default router;

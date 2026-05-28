@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { ClerkProvider } from "@clerk/nextjs";
 import { QueryProvider } from "@/providers/query-provider";
+import { ClerkAxiosProvider } from "@/providers/clerk-axios-provider";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -29,7 +30,9 @@ export default function RootLayout({
       <html lang="en">
         <body>
           <QueryProvider>
-            {children}
+            <ClerkAxiosProvider>
+              {children}
+            </ClerkAxiosProvider>
           </QueryProvider>
         </body>
       </html>
