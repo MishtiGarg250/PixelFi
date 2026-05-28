@@ -1,69 +1,77 @@
+import prisma from "../lib/prisma.js";
 
-import prisma from '../lib/prisma.js';
-
-interface CreateAccountInput{
-    name: string;
-    brokerName: string;
-    accountType:
-    | "BROKERAGE"
-    | "BANK"
-    | "CRYPTO";
-
-    currency: string;
-    portfolioId?: string;
+interface CreateAccountInput {
+  name: string;
+  brokerName: string;
+  accountType: "BROKERAGE" | "BANK" | "CRYPTO";
+  currency: string;
 }
 
-export const createAccountService = async(
-    clerkUserId: string,
-    data: CreateAccountInput
+/**
+ * Resolve clerkUserId → internal user, and validate the portfolio belongs to them.
+ */
+async function resolveUserAndPortfolio(
+  clerkUserId: string,
+  portfolioId: string
+) {
+  const user = await prisma.user.findUnique({ where: { clerkUserId } });
+  if (!user) throw new Error("User not found");
+
+  const portfolio = await prisma.portfolio.findFirst({
+    where: { id: portfolioId, userId: user.id },
+  });
+  if (!portfolio)
+    throw new Error("Portfolio not found or does not belong to user");
+
+  return { user, portfolio };
+}
+
+export const createAccountService = async (
+  clerkUserId: string,
+  portfolioId: string,
+  data: CreateAccountInput
 ) => {
-    const user = await prisma.user.findUnique({
-        where:{
-            clerkUserId
-        },
-    });
+  await resolveUserAndPortfolio(clerkUserId, portfolioId);
 
-    if(!user){
-        throw new Error("User not found");
-    }
+  const account = await prisma.account.create({
+    data: {
+      name: data.name,
+      brokerName: data.brokerName,
+      accountType: data.accountType,
+      currency: data.currency,
+      portfolioId,
+    },
+  });
 
+  return account;
+};
 
-    const account = await prisma.account.create({
-        data:{
-            name: data.name,
-            brokerName: data.brokerName,
-            accountType: data.accountType,
-            currency: data.currency,
-            userId: user.id,
-            portfolioId: data.portfolioId,
-        }
-    });
+export const getPortfolioAccountsService = async (
+  clerkUserId: string,
+  portfolioId: string
+) => {
+  await resolveUserAndPortfolio(clerkUserId, portfolioId);
 
-    return account;
-}
+  const accounts = await prisma.account.findMany({
+    where: { portfolioId },
+    orderBy: { createdAt: "desc" },
+  });
 
-export const getUserAccountsService = async(clerkUserId: string) => {
-    const user = await prisma.user.findUnique({
-        where:{
-            clerkUserId
-        },
-    });
+  return accounts;
+};
 
-    if(!user){
-        throw new Error("User not found");
-    }
+export const deleteAccountService = async (
+  clerkUserId: string,
+  portfolioId: string,
+  accountId: string
+) => {
+  await resolveUserAndPortfolio(clerkUserId, portfolioId);
 
-    const accounts = await prisma.account.findMany({
-        where:{
-            userId: user.id
-        },
-        include:{
-            portfolio: true,
-        },
-        orderBy:{
-            createdAt:"desc",
-        }
-    });
+  const account = await prisma.account.findFirst({
+    where: { id: accountId, portfolioId },
+  });
+  if (!account)
+    throw new Error("Account not found or does not belong to this portfolio");
 
-    return accounts;
-}
+  await prisma.account.delete({ where: { id: accountId } });
+};

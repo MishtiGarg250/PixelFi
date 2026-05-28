@@ -2,6 +2,7 @@ import express from "express";
 import cors from "cors";
 import { clerkMiddleware } from "@clerk/express";
 
+
 import userRoutes from "./routes/user.routes.js";
 import accountRoutes from "./routes/account.routes.js";
 import analyticsRoutes from "./routes/analytics.routes.js";
@@ -36,4 +37,4 @@ app.use("/api/market", marketRoutes);
 app.use("/api/portfolios", portfolioRoutes);
 app.use("/api/transactions", transactionRoutes);
 
-export default app;
+export default app;

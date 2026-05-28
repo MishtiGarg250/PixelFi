@@ -12,12 +12,25 @@ datasource db {
   provider = "postgresql"
 }
 
-enum AssetType {
+// ─────────────────────────────────────────────
+// ENUMS
+// ─────────────────────────────────────────────
+
+enum MarketAssetType {
   STOCK
   ETF
   CRYPTO
   BOND
   MUTUAL_FUND
+}
+
+enum CustomAssetCategory {
+  REAL_ESTATE
+  VEHICLE
+  LUXURY_ITEM
+  ART
+  COLLECTIBLE
+  OTHER
 }
 
 enum TransactionType {
@@ -53,9 +66,9 @@ enum InsightType {
   MARKET
 }
 
-//
+// ─────────────────────────────────────────────
 // USER
-//
+// ─────────────────────────────────────────────
 
 model User {
   id              String   @id @default(cuid())
@@ -81,15 +94,15 @@ model User {
   //
 
   portfolios      Portfolio[]
-  accounts        Account[]
   goals           Goal[]
   expenses        Expense[]
   insights        AIInsight[]
+  customAssets    CustomAsset[]
 }
 
-//
+// ─────────────────────────────────────────────
 // PORTFOLIO
-//
+// ─────────────────────────────────────────────
 
 model Portfolio {
   id              String   @id @default(cuid())
@@ -111,22 +124,20 @@ model Portfolio {
 
   accounts        Account[]
   holdings        Holding[]
+  customAssets    CustomAsset[]
 
   @@index([userId])
 }
 
-//
+// ─────────────────────────────────────────────
 // ACCOUNT
-//
+// ─────────────────────────────────────────────
 
 model Account {
   id              String   @id @default(cuid())
 
-  userId          String
-  user            User @relation(fields: [userId], references: [id])
-
-  portfolioId     String?
-  portfolio       Portfolio? @relation(fields: [portfolioId], references: [id])
+  portfolioId     String
+  portfolio       Portfolio @relation(fields: [portfolioId], references: [id])
 
   name            String
 
@@ -145,21 +156,21 @@ model Account {
 
   transactions    Transaction[]
 
-  @@index([userId])
   @@index([portfolioId])
 }
 
-//
-// ASSET
-//
+// ─────────────────────────────────────────────
+// MARKET ASSET
+// Traded securities: stocks, ETFs, crypto, bonds, mutual funds
+// ─────────────────────────────────────────────
 
-model Asset {
+model MarketAsset {
   id              String   @id @default(cuid())
 
   symbol          String   @unique
   name            String
 
-  assetType       AssetType
+  assetType       MarketAssetType
 
   exchange        String?
   sector          String?
@@ -180,9 +191,44 @@ model Asset {
   @@index([symbol])
 }
 
-//
+// ─────────────────────────────────────────────
+// CUSTOM ASSET
+// Illiquid / real-world assets: land, cars, luxury items, art, etc.
+// ─────────────────────────────────────────────
+
+model CustomAsset {
+  id              String   @id @default(cuid())
+
+  userId          String
+  user            User @relation(fields: [userId], references: [id])
+
+  portfolioId     String
+  portfolio       Portfolio @relation(fields: [portfolioId], references: [id])
+
+  name            String
+  description     String?
+
+  category        CustomAssetCategory
+
+  // Current estimated value (manually updated by user)
+  currentValue    Decimal  @db.Decimal(18, 2)
+
+  purchasePrice   Decimal? @db.Decimal(18, 2)
+  purchaseDate    DateTime?
+
+  currency        String
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([userId])
+  @@index([portfolioId])
+}
+
+// ─────────────────────────────────────────────
 // TRANSACTION
-//
+// Applies to MarketAssets only
+// ─────────────────────────────────────────────
 
 model Transaction {
   id              String   @id @default(cuid())
@@ -190,8 +236,8 @@ model Transaction {
   accountId       String
   account         Account @relation(fields: [accountId], references: [id])
 
-  assetId         String
-  asset           Asset @relation(fields: [assetId], references: [id])
+  marketAssetId   String
+  marketAsset     MarketAsset @relation(fields: [marketAssetId], references: [id])
 
   type            TransactionType
 
@@ -209,13 +255,14 @@ model Transaction {
   updatedAt       DateTime @updatedAt
 
   @@index([accountId])
-  @@index([assetId])
+  @@index([marketAssetId])
   @@index([executedAt])
 }
 
-//
+// ─────────────────────────────────────────────
 // HOLDINGS
-//
+// Computed holdings per portfolio x market asset
+// ─────────────────────────────────────────────
 
 model Holding {
   id              String   @id @default(cuid())
@@ -223,8 +270,8 @@ model Holding {
   portfolioId     String
   portfolio       Portfolio @relation(fields: [portfolioId], references: [id])
 
-  assetId         String
-  asset           Asset @relation(fields: [assetId], references: [id])
+  marketAssetId   String
+  marketAsset     MarketAsset @relation(fields: [marketAssetId], references: [id])
 
   quantity        Decimal @db.Decimal(18, 4)
 
@@ -232,21 +279,21 @@ model Holding {
 
   updatedAt       DateTime @updatedAt
 
-  @@unique([portfolioId, assetId])
+  @@unique([portfolioId, marketAssetId])
 
   @@index([portfolioId])
-  @@index([assetId])
+  @@index([marketAssetId])
 }
 
-//
+// ─────────────────────────────────────────────
 // MARKET DATA
-//
+// ─────────────────────────────────────────────
 
 model MarketData {
   id              String   @id @default(cuid())
 
-  assetId         String
-  asset           Asset @relation(fields: [assetId], references: [id])
+  marketAssetId   String
+  marketAsset     MarketAsset @relation(fields: [marketAssetId], references: [id])
 
   price           Decimal @db.Decimal(18, 4)
 
@@ -258,12 +305,12 @@ model MarketData {
 
   fetchedAt       DateTime
 
-  @@index([assetId, fetchedAt])
+  @@index([marketAssetId, fetchedAt])
 }
 
-//
+// ─────────────────────────────────────────────
 // GOALS
-//
+// ─────────────────────────────────────────────
 
 model Goal {
   id              String   @id @default(cuid())
@@ -285,9 +332,9 @@ model Goal {
   @@index([userId])
 }
 
-//
+// ─────────────────────────────────────────────
 // EXPENSES
-//
+// ─────────────────────────────────────────────
 
 model Expense {
   id              String   @id @default(cuid())
@@ -311,9 +358,9 @@ model Expense {
   @@index([occurredAt])
 }
 
-//
+// ─────────────────────────────────────────────
 // AI INSIGHTS
-//
+// ─────────────────────────────────────────────
 
 model AIInsight {
   id              String   @id @default(cuid())

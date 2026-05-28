@@ -1,9 +1,10 @@
 import express from "express";
-import {protect} from "../middleware/auth.middleware.js";
-import { getUserHoldings } from "../controllers/holdings.controller.js";
+import { protect } from "../middleware/auth.middleware.js";
+import { getPortfolioHoldings } from "../controllers/holdings.controller.js";
 
-const router = express.Router();
+// Mounted at /api/portfolios/:portfolioId/holdings
+const router = express.Router({ mergeParams: true });
 
-router.get("/", protect, getUserHoldings);
+router.get("/", protect, getPortfolioHoldings);
 
 export default router;
