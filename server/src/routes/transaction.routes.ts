@@ -9,6 +9,6 @@ import {
 const router = express.Router({ mergeParams: true });
 
 router.post('/', protect, createTransaction);
-router.get('/', protect, getUserTransactions);
+router.get('/', protect, getPortfolioTransactions);
 
 export default router;
