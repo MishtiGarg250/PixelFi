@@ -10,8 +10,6 @@ import marketRoutes from "./routes/market.routes.js";
 import portfolioRoutes from "./routes/portfolio.routes.js";
 import transactionRoutes from "./routes/transaction.routes.js";
 
-console.log("🔥 APP.TS IS RUNNING");
-
 const app = express();
 
 app.use(
