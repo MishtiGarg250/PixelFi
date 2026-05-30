@@ -49,7 +49,7 @@ export const getCustomAssets = async (req: Request, res: Response) => {
     const { userId } = getAuth(req);
     if (!userId) return res.status(401).json({ message: "Unauthorized" });
 
-    const { portfolioId } = req.params;
+    const  portfolioId  = req.params.portfolioId as string;
     const assets = await getCustomAssetsService(userId, portfolioId);
     return res.status(200).json({ success: true, assets });
   } catch (error) {
@@ -60,10 +60,11 @@ export const getCustomAssets = async (req: Request, res: Response) => {
 
 export const createCustomAsset = async (req: Request, res: Response) => {
   try {
-    const { userId } = getAuth(req);
+    const userId  = getAuth(req).userId as string;
     if (!userId) return res.status(401).json({ message: "Unauthorized" });
 
-    const { portfolioId } = req.params;
+    
+    const portfolioId = req.params.portfolioId as string;
     const validatedData = createCustomAssetSchema.parse(req.body);
     const asset = await createCustomAssetService(userId, portfolioId, validatedData);
     return res.status(201).json({ success: true, asset });
@@ -75,10 +76,11 @@ export const createCustomAsset = async (req: Request, res: Response) => {
 
 export const updateCustomAsset = async (req: Request, res: Response) => {
   try {
-    const { userId } = getAuth(req);
+    const userId  = getAuth(req).userId as string;
     if (!userId) return res.status(401).json({ message: "Unauthorized" });
 
-    const { portfolioId, assetId } = req.params;
+    const assetId  = req.params.assetId as string;
+    const portfolioId = req.params.portfolioId as string;
     const validatedData = updateCustomAssetSchema.parse(req.body);
     const asset = await updateCustomAssetService(userId, portfolioId, assetId, validatedData);
     return res.status(200).json({ success: true, asset });
@@ -90,10 +92,11 @@ export const updateCustomAsset = async (req: Request, res: Response) => {
 
 export const deleteCustomAsset = async (req: Request, res: Response) => {
   try {
-    const { userId } = getAuth(req);
+    const userId  = getAuth(req).userId as string;
     if (!userId) return res.status(401).json({ message: "Unauthorized" });
 
-    const { portfolioId, assetId } = req.params;
+    const assetId  = req.params.assetId as string;
+    const portfolioId = req.params.portfolioId as string;
     await deleteCustomAssetService(userId, portfolioId, assetId);
     return res.status(200).json({ success: true, message: "Custom asset deleted" });
   } catch (error) {

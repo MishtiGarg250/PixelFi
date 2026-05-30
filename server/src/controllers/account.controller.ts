@@ -14,7 +14,14 @@ export const createAccount = async (req: Request, res: Response) => {
       return res.status(401).json({ message: "Unauthorized" });
     }
 
-    const { portfolioId } = req.params;
+    const  portfolioId  = req.params.portfolioId as string;
+    if (!portfolioId) {
+      return res.status(400).json({
+        success: false,
+        message: "Portfolio ID is required",
+      });
+    }
+
     const validatedData = createAccountSchema.parse(req.body);
 
     const account = await createAccountService(userId, portfolioId, validatedData);
@@ -33,7 +40,7 @@ export const getPortfolioAccounts = async (req: Request, res: Response) => {
       return res.status(401).json({ message: "Unauthorized" });
     }
 
-    const { portfolioId } = req.params;
+    const  portfolioId = req.params.portfolioId as string;
     const accounts = await getPortfolioAccountsService(userId, portfolioId);
 
     return res.status(200).json({ success: true, accounts });
@@ -50,7 +57,8 @@ export const deleteAccount = async (req: Request, res: Response) => {
       return res.status(401).json({ message: "Unauthorized" });
     }
 
-    const { portfolioId, accountId } = req.params;
+    const  accountId  = req.params.accountId as string;
+    const portfolioId = req.params.portfolioId as string;
     await deleteAccountService(userId, portfolioId, accountId);
 
     return res.status(200).json({ success: true, message: "Account deleted" });

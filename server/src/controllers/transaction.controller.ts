@@ -13,7 +13,7 @@ export const createTransaction = async (req: Request, res: Response) => {
       return res.status(401).json({ message: "Unauthorized" });
     }
 
-    const { portfolioId } = req.params;
+    const portfolioId  = req.params.portfolioId as string;
     const validatedData = createTransactionSchema.parse(req.body);
 
     const transaction = await createTransactionService(userId, portfolioId, validatedData);
@@ -32,7 +32,7 @@ export const getPortfolioTransactions = async (req: Request, res: Response) => {
       return res.status(401).json({ message: "Unauthorized" });
     }
 
-    const { portfolioId } = req.params;
+    const portfolioId  = req.params.portfolioId as string;
     const transactions = await getPortfolioTransactionsService(userId, portfolioId);
 
     return res.status(200).json({ success: true, data: transactions });

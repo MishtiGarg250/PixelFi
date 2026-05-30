@@ -6,7 +6,7 @@ interface CreateTransactionInput {
   type: "BUY" | "SELL" | "DEPOSIT" | "WITHDRAWAL" | "DIVIDEND";
   quantity: number;
   price: number;
-  fees?: number;
+  fees?: number | undefined;
   currency: string;
   executedAt: string;
 }

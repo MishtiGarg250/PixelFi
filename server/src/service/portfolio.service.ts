@@ -2,7 +2,7 @@ import prisma from "../lib/prisma.js";
 
 interface CreatePortfolioInput {
   name: string;
-  description?: string;
+  description?: string | undefined;
 }
 
 export const createPortfolioService = async (
@@ -13,7 +13,7 @@ export const createPortfolioService = async (
     await prisma.portfolio.create({
       data: {
         name: data.name,
-        description: data.description,
+        description: data.description ?? null,
 
         user: {
           connect: {

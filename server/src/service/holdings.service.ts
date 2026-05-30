@@ -75,3 +75,35 @@ export const getPortfolioHoldingsService = async (
 
   return finalHoldings;
 };
+
+export const getUserHoldingsService = async (
+  clerkUserId: string
+) => {
+  const user = await prisma.user.findUnique({
+    where: { clerkUserId },
+  });
+
+  if (!user) {
+    throw new Error("User not found");
+  }
+
+  const portfolios = await prisma.portfolio.findMany({
+    where: {
+      userId: user.id,
+    },
+  });
+
+  const holdings = [];
+
+  for (const portfolio of portfolios) {
+    const portfolioHoldings =
+      await getPortfolioHoldingsService(
+        clerkUserId,
+        portfolio.id
+      );
+
+    holdings.push(...portfolioHoldings);
+  }
+
+  return holdings;
+};

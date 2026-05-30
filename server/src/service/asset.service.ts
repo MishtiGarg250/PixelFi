@@ -8,8 +8,8 @@ interface CreateMarketAssetInput {
   symbol: string;
   name: string;
   assetType: "STOCK" | "ETF" | "CRYPTO" | "BOND" | "MUTUAL_FUND";
-  exchange?: string;
-  sector?: string;
+  exchange?: string | undefined;
+  sector?: string | undefined;
   currency: string;
 }
 
@@ -35,10 +35,10 @@ export const createMarketAssetService = async (
       symbol: data.symbol.toUpperCase(),
       name: data.name,
       assetType: data.assetType,
-      exchange: data.exchange,
-      sector: data.sector,
+      exchange: data.exchange ?? null,
+      sector: data.sector ?? null,
       currency: data.currency,
-    },
+    }
   });
   return marketAsset;
 };
@@ -49,34 +49,35 @@ export const createMarketAssetService = async (
 
 interface CreateCustomAssetInput {
   name: string;
-  description?: string;
+  description?: string | undefined;
   category:
-    | "REAL_ESTATE"
-    | "VEHICLE"
-    | "LUXURY_ITEM"
-    | "ART"
-    | "COLLECTIBLE"
-    | "OTHER";
+  | "REAL_ESTATE"
+  | "VEHICLE"
+  | "LUXURY_ITEM"
+  | "ART"
+  | "COLLECTIBLE"
+  | "OTHER";
   currentValue: number;
-  purchasePrice?: number;
-  purchaseDate?: string;
+  purchasePrice?: number | undefined;
+  purchaseDate?: string | undefined;
   currency: string;
 }
 
 interface UpdateCustomAssetInput {
-  name?: string;
-  description?: string;
+  name?: string | undefined;
+  description?: string | undefined;
   category?:
-    | "REAL_ESTATE"
-    | "VEHICLE"
-    | "LUXURY_ITEM"
-    | "ART"
-    | "COLLECTIBLE"
-    | "OTHER";
-  currentValue?: number;
-  purchasePrice?: number;
-  purchaseDate?: string;
-  currency?: string;
+  | "REAL_ESTATE"
+  | "VEHICLE"
+  | "LUXURY_ITEM"
+  | "ART"
+  | "COLLECTIBLE"
+  | "OTHER"
+  | undefined;
+  currentValue?: number | undefined;
+  purchasePrice?: number | undefined;
+  purchaseDate?: string | undefined;
+  currency?: string | undefined;
 }
 
 async function resolveUserAndPortfolio(
@@ -118,15 +119,17 @@ export const createCustomAssetService = async (
     data: {
       userId: user.id,
       portfolioId,
+
       name: data.name,
-      description: data.description,
       category: data.category,
       currentValue: data.currentValue,
-      purchasePrice: data.purchasePrice,
+      currency: data.currency,
+
+      description: data.description ?? null,
+      purchasePrice: data.purchasePrice ?? null,
       purchaseDate: data.purchaseDate
         ? new Date(data.purchaseDate)
-        : undefined,
-      currency: data.currency,
+        : null,
     },
   });
 };

@@ -9,7 +9,7 @@ export const getPortfolioHoldings = async (req: Request, res: Response) => {
       return res.status(401).json({ message: "Unauthorized" });
     }
 
-    const { portfolioId } = req.params;
+    const  portfolioId = req.params.portfolioId as string;
     const holdings = await getPortfolioHoldingsService(userId, portfolioId);
 
     return res.status(200).json({ success: true, holdings });

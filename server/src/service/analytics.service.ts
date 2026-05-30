@@ -121,7 +121,6 @@ export const getPerformanceService =
               holding.symbol,
 
             investedAmount,
-
             currentValue:
               holding.currentValue,
 

@@ -3,7 +3,7 @@ import {getQuoteService} from "../service/market.service.js";
 
 export const getQuote = async(req: Request, res: Response) => {
     try {
-        const {symbol} = req.params;
+        const symbol = req.params.Symbol as string;
         const quote = await getQuoteService(symbol);
         return res.status(200).json({
             success: true,
