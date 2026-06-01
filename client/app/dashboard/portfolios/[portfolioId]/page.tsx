@@ -123,7 +123,7 @@ function CreateAccountModal({
             <button
               type="submit"
               disabled={isPending || !name.trim() || !brokerName.trim()}
-              className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#b5b5f6] to-[#f7bff4] py-2.5 text-sm font-medium text-black transition hover:opacity-90 disabled:opacity-50"
+              className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-linear-to-r from-[#b5b5f6] to-[#f7bff4] py-2.5 text-sm font-medium text-black transition hover:opacity-90 disabled:opacity-50"
             >
               {isPending ? <><Loader2 size={14} className="animate-spin" /> Creating...</> : <><Plus size={14} /> Add Account</>}
             </button>
