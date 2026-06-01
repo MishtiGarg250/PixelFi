@@ -5,11 +5,21 @@ import { getAuth } from "@clerk/express";
 import {
   createPortfolioService,
   getUserPortfoliosService,
+  getPortfolioByIdService,
+  updatePortfolioService,
+  deletePortfolioService,
 } from "../service/portfolio.service.js";
 
 import {
   createPortfolioSchema,
 } from "../validators/portfolio.validator.js";
+
+import { z } from "zod";
+
+const updatePortfolioSchema = z.object({
+  name: z.string().min(3).max(50).optional(),
+  description: z.string().max(200).nullable().optional(),
+});
 
 export const createPortfolio = async (
   req: Request,
@@ -76,5 +86,61 @@ export const getUserPortfolios = async (
       success: false,
       message: "Failed to fetch portfolios",
     });
+  }
+};
+
+export const getPortfolioById = async (
+  req: Request,
+  res: Response
+) => {
+  try {
+    const { userId } = getAuth(req);
+    if (!userId) return res.status(401).json({ message: "Unauthorized" });
+
+    const portfolioId = req.params.portfolioId as string;
+    const portfolio = await getPortfolioByIdService(userId, portfolioId);
+
+    return res.status(200).json({ success: true, portfolio });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ success: false, message: "Failed to fetch portfolio" });
+  }
+};
+
+export const updatePortfolio = async (
+  req: Request,
+  res: Response
+) => {
+  try {
+    const { userId } = getAuth(req);
+    if (!userId) return res.status(401).json({ message: "Unauthorized" });
+
+    const portfolioId = req.params.portfolioId as string;
+    const validatedData = updatePortfolioSchema.parse(req.body);
+
+    const portfolio = await updatePortfolioService(userId, portfolioId, validatedData);
+
+    return res.status(200).json({ success: true, portfolio });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ success: false, message: "Failed to update portfolio" });
+  }
+};
+
+export const deletePortfolio = async (
+  req: Request,
+  res: Response
+) => {
+  try {
+    const { userId } = getAuth(req);
+    if (!userId) return res.status(401).json({ message: "Unauthorized" });
+
+    const portfolioId = req.params.portfolioId as string;
+    await deletePortfolioService(userId, portfolioId);
+
+    return res.status(200).json({ success: true, message: "Portfolio deleted" });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ success: false, message: "Failed to delete portfolio" });
   }
 };

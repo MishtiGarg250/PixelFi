@@ -1,8 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Get a free hosted Postgres database in seconds: `npx create-db`
-
 generator client {
   provider = "prisma-client"
   output   = "../src/generated/prisma"
@@ -12,9 +7,181 @@ datasource db {
   provider = "postgresql"
 }
 
-// ─────────────────────────────────────────────
-// ENUMS
-// ─────────────────────────────────────────────
+model User {
+  id           String        @id @default(cuid())
+  clerkUserId  String        @unique
+  email        String        @unique
+  firstName    String?
+  lastName     String?
+  imageUrl     String?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  baseCurrency String        @default("USD")
+  username     String?       @unique
+  insights     AIInsight[]
+  customAssets CustomAsset[]
+  expenses     Expense[]
+  goals        Goal[]
+  portfolios   Portfolio[]
+}
+
+model Portfolio {
+  id           String              @id @default(cuid())
+  userId       String
+  name         String
+  description  String?
+  visibility   PortfolioVisibility @default(PRIVATE)
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+  accounts     Account[]
+  customAssets CustomAsset[]
+  holdings     Holding[]
+  user         User                @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+}
+
+model Account {
+  id           String        @id @default(cuid())
+  portfolioId  String
+  name         String
+  brokerName   String
+  accountType  AccountType
+  currency     String
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  portfolio    Portfolio     @relation(fields: [portfolioId], references: [id])
+  transactions Transaction[]
+
+  @@index([portfolioId])
+}
+
+model MarketAsset {
+  id           String          @id @default(cuid())
+  symbol       String          @unique
+  name         String
+  assetType    MarketAssetType
+  exchange     String?
+  sector       String?
+  currency     String
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+  holdings     Holding[]
+  marketData   MarketData[]
+  transactions Transaction[]
+
+  @@index([symbol])
+}
+
+model CustomAsset {
+  id            String              @id @default(cuid())
+  userId        String
+  portfolioId   String
+  name          String
+  description   String?
+  category      CustomAssetCategory
+  currentValue  Decimal             @db.Decimal(18, 2)
+  purchasePrice Decimal?            @db.Decimal(18, 2)
+  purchaseDate  DateTime?
+  currency      String
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+  portfolio     Portfolio           @relation(fields: [portfolioId], references: [id])
+  user          User                @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([portfolioId])
+}
+
+model Transaction {
+  id            String          @id @default(cuid())
+  accountId     String
+  type          TransactionType
+  quantity      Decimal         @db.Decimal(18, 4)
+  price         Decimal         @db.Decimal(18, 4)
+  fees          Decimal         @default(0) @db.Decimal(18, 4)
+  currency      String
+  executedAt    DateTime
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  marketAssetId String
+  account       Account         @relation(fields: [accountId], references: [id])
+  marketAsset   MarketAsset     @relation(fields: [marketAssetId], references: [id])
+
+  @@index([accountId])
+  @@index([marketAssetId])
+  @@index([executedAt])
+}
+
+model Holding {
+  id            String      @id @default(cuid())
+  portfolioId   String
+  quantity      Decimal     @db.Decimal(18, 4)
+  averageCost   Decimal     @db.Decimal(18, 4)
+  updatedAt     DateTime    @updatedAt
+  marketAssetId String
+  marketAsset   MarketAsset @relation(fields: [marketAssetId], references: [id])
+  portfolio     Portfolio   @relation(fields: [portfolioId], references: [id])
+
+  @@unique([portfolioId, marketAssetId])
+  @@index([portfolioId])
+  @@index([marketAssetId])
+}
+
+model MarketData {
+  id            String      @id @default(cuid())
+  price         Decimal     @db.Decimal(18, 4)
+  currency      String
+  marketCap     Decimal?    @db.Decimal(20, 2)
+  volume        Decimal?    @db.Decimal(20, 2)
+  fetchedAt     DateTime
+  marketAssetId String
+  marketAsset   MarketAsset @relation(fields: [marketAssetId], references: [id])
+
+  @@index([marketAssetId, fetchedAt])
+}
+
+model Goal {
+  id            String    @id @default(cuid())
+  userId        String
+  title         String
+  targetAmount  Decimal   @db.Decimal(18, 2)
+  currentAmount Decimal   @default(0) @db.Decimal(18, 2)
+  targetDate    DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  user          User      @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+}
+
+model Expense {
+  id         String   @id @default(cuid())
+  userId     String
+  category   String
+  title      String?
+  amount     Decimal  @db.Decimal(18, 2)
+  currency   String
+  occurredAt DateTime
+  createdAt  DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([occurredAt])
+}
+
+model AIInsight {
+  id          String          @id @default(cuid())
+  userId      String
+  type        InsightType
+  severity    InsightSeverity
+  title       String
+  description String
+  createdAt   DateTime        @default(now())
+  user        User            @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+}
 
 enum MarketAssetType {
   STOCK
@@ -64,319 +231,4 @@ enum InsightType {
   PERFORMANCE
   SAVINGS
   MARKET
-}
-
-// ─────────────────────────────────────────────
-// USER
-// ─────────────────────────────────────────────
-
-model User {
-  id              String   @id @default(cuid())
-
-  // Clerk
-  clerkUserId     String   @unique
-
-  email           String   @unique
-  username        String?  @unique
-
-  firstName       String?
-  lastName        String?
-
-  imageUrl        String?
-
-  baseCurrency    String   @default("USD")
-
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-
-  //
-  // Relations
-  //
-
-  portfolios      Portfolio[]
-  goals           Goal[]
-  expenses        Expense[]
-  insights        AIInsight[]
-  customAssets    CustomAsset[]
-}
-
-// ─────────────────────────────────────────────
-// PORTFOLIO
-// ─────────────────────────────────────────────
-
-model Portfolio {
-  id              String   @id @default(cuid())
-
-  userId          String
-  user            User @relation(fields: [userId], references: [id])
-
-  name            String
-  description     String?
-
-  visibility      PortfolioVisibility @default(PRIVATE)
-
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-
-  //
-  // Relations
-  //
-
-  accounts        Account[]
-  holdings        Holding[]
-  customAssets    CustomAsset[]
-
-  @@index([userId])
-}
-
-// ─────────────────────────────────────────────
-// ACCOUNT
-// ─────────────────────────────────────────────
-
-model Account {
-  id              String   @id @default(cuid())
-
-  portfolioId     String
-  portfolio       Portfolio @relation(fields: [portfolioId], references: [id])
-
-  name            String
-
-  brokerName      String
-
-  accountType     AccountType
-
-  currency        String
-
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-
-  //
-  // Relations
-  //
-
-  transactions    Transaction[]
-
-  @@index([portfolioId])
-}
-
-// ─────────────────────────────────────────────
-// MARKET ASSET
-// Traded securities: stocks, ETFs, crypto, bonds, mutual funds
-// ─────────────────────────────────────────────
-
-model MarketAsset {
-  id              String   @id @default(cuid())
-
-  symbol          String   @unique
-  name            String
-
-  assetType       MarketAssetType
-
-  exchange        String?
-  sector          String?
-
-  currency        String
-
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-
-  //
-  // Relations
-  //
-
-  transactions    Transaction[]
-  holdings        Holding[]
-  marketData      MarketData[]
-
-  @@index([symbol])
-}
-
-// ─────────────────────────────────────────────
-// CUSTOM ASSET
-// Illiquid / real-world assets: land, cars, luxury items, art, etc.
-// ─────────────────────────────────────────────
-
-model CustomAsset {
-  id              String   @id @default(cuid())
-
-  userId          String
-  user            User @relation(fields: [userId], references: [id])
-
-  portfolioId     String
-  portfolio       Portfolio @relation(fields: [portfolioId], references: [id])
-
-  name            String
-  description     String?
-
-  category        CustomAssetCategory
-
-  // Current estimated value (manually updated by user)
-  currentValue    Decimal  @db.Decimal(18, 2)
-
-  purchasePrice   Decimal? @db.Decimal(18, 2)
-  purchaseDate    DateTime?
-
-  currency        String
-
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-
-  @@index([userId])
-  @@index([portfolioId])
-}
-
-// ─────────────────────────────────────────────
-// TRANSACTION
-// Applies to MarketAssets only
-// ─────────────────────────────────────────────
-
-model Transaction {
-  id              String   @id @default(cuid())
-
-  accountId       String
-  account         Account @relation(fields: [accountId], references: [id])
-
-  marketAssetId   String
-  marketAsset     MarketAsset @relation(fields: [marketAssetId], references: [id])
-
-  type            TransactionType
-
-  quantity        Decimal  @db.Decimal(18, 4)
-
-  price           Decimal  @db.Decimal(18, 4)
-
-  fees            Decimal  @default(0) @db.Decimal(18, 4)
-
-  currency        String
-
-  executedAt      DateTime
-
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-
-  @@index([accountId])
-  @@index([marketAssetId])
-  @@index([executedAt])
-}
-
-// ─────────────────────────────────────────────
-// HOLDINGS
-// Computed holdings per portfolio x market asset
-// ─────────────────────────────────────────────
-
-model Holding {
-  id              String   @id @default(cuid())
-
-  portfolioId     String
-  portfolio       Portfolio @relation(fields: [portfolioId], references: [id])
-
-  marketAssetId   String
-  marketAsset     MarketAsset @relation(fields: [marketAssetId], references: [id])
-
-  quantity        Decimal @db.Decimal(18, 4)
-
-  averageCost     Decimal @db.Decimal(18, 4)
-
-  updatedAt       DateTime @updatedAt
-
-  @@unique([portfolioId, marketAssetId])
-
-  @@index([portfolioId])
-  @@index([marketAssetId])
-}
-
-// ─────────────────────────────────────────────
-// MARKET DATA
-// ─────────────────────────────────────────────
-
-model MarketData {
-  id              String   @id @default(cuid())
-
-  marketAssetId   String
-  marketAsset     MarketAsset @relation(fields: [marketAssetId], references: [id])
-
-  price           Decimal @db.Decimal(18, 4)
-
-  currency        String
-
-  marketCap       Decimal? @db.Decimal(20, 2)
-
-  volume          Decimal? @db.Decimal(20, 2)
-
-  fetchedAt       DateTime
-
-  @@index([marketAssetId, fetchedAt])
-}
-
-// ─────────────────────────────────────────────
-// GOALS
-// ─────────────────────────────────────────────
-
-model Goal {
-  id              String   @id @default(cuid())
-
-  userId          String
-  user            User @relation(fields: [userId], references: [id])
-
-  title           String
-
-  targetAmount    Decimal @db.Decimal(18, 2)
-
-  currentAmount   Decimal @default(0) @db.Decimal(18, 2)
-
-  targetDate      DateTime?
-
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-
-  @@index([userId])
-}
-
-// ─────────────────────────────────────────────
-// EXPENSES
-// ─────────────────────────────────────────────
-
-model Expense {
-  id              String   @id @default(cuid())
-
-  userId          String
-  user            User @relation(fields: [userId], references: [id])
-
-  category        String
-
-  title           String?
-
-  amount          Decimal @db.Decimal(18, 2)
-
-  currency        String
-
-  occurredAt      DateTime
-
-  createdAt       DateTime @default(now())
-
-  @@index([userId])
-  @@index([occurredAt])
-}
-
-// ─────────────────────────────────────────────
-// AI INSIGHTS
-// ─────────────────────────────────────────────
-
-model AIInsight {
-  id              String   @id @default(cuid())
-
-  userId          String
-  user            User @relation(fields: [userId], references: [id])
-
-  type            InsightType
-
-  severity        InsightSeverity
-
-  title           String
-
-  description     String
-
-  createdAt       DateTime @default(now())
-
-  @@index([userId])
 }
