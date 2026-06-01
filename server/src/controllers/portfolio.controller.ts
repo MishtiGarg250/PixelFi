@@ -11,15 +11,9 @@ import {
 } from "../service/portfolio.service.js";
 
 import {
-  createPortfolioSchema,
+  createPortfolioSchema,updatePortfolioSchema
 } from "../validators/portfolio.validator.js";
 
-import { z } from "zod";
-
-const updatePortfolioSchema = z.object({
-  name: z.string().min(3).max(50).optional(),
-  description: z.string().max(200).nullable().optional(),
-});
 
 export const createPortfolio = async (
   req: Request,

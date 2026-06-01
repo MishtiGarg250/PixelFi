@@ -6,8 +6,8 @@ interface CreatePortfolioInput {
 }
 
 interface UpdatePortfolioInput {
-  name?: string;
-  description?: string | null;
+  name?: string | undefined;
+  description?: string | null | undefined;
 }
 
 export const createPortfolioService = async (
