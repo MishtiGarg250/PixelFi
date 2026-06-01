@@ -12,7 +12,7 @@ import {
   Settings,
   Sparkles
 } from "lucide-react";
-import { label } from "framer-motion/client";
+
 
 const links = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
@@ -44,7 +44,7 @@ export const Sidebar = () => {
         <nav className="space-y-1">
           {links.map((link) => {
             const Icon = link.icon;
-            const isActive = pathname === link.href; // Elegant fallback state handling
+            const isActive = pathname === link.href || pathname.startsWith(link.href + "/") && link.href !== "/dashboard"; // Highlight parent for nested routes
 
             return (
               <Link 
