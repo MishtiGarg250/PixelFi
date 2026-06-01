@@ -18,9 +18,9 @@ router.post("/", protect, createPortfolio);
 router.get("/", protect, getUserPortfolios);
 
 // Nested resource routes under /:portfolioId
-router.use("/:portfolioId/accounts", accountRoutes);
-router.use("/:portfolioId/holdings", holdingsRoutes);
-router.use("/:portfolioId/transactions", transactionRoutes);
-router.use("/:portfolioId/assets/custom", customAssetRoutes);
+router.use("/:portfolioId/accounts", protect,accountRoutes);
+router.use("/:portfolioId/holdings",protect, holdingsRoutes);
+router.use("/:portfolioId/transactions",protect, transactionRoutes);
+router.use("/:portfolioId/assets/custom",protect, customAssetRoutes);
 
 export default router;
