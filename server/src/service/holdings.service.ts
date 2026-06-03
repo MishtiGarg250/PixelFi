@@ -1,109 +1,176 @@
 import prisma from "../lib/prisma.js";
 
-export const getPortfolioHoldingsService = async (
+// ─────────────────────────────────────────────
+// UserMarketAsset (replaces old Holding model)
+// ─────────────────────────────────────────────
+
+interface UpsertUserMarketAssetInput {
+  marketAssetId: string;
+  quantity: number;
+  averageCost: number;
+}
+
+/**
+ * Upsert a UserMarketAsset record for a user.
+ * If one already exists for this (userId, marketAssetId) pair, it updates it.
+ */
+export const upsertUserMarketAssetService = async (
+  clerkUserId: string,
+  data: UpsertUserMarketAssetInput
+) => {
+  const user = await prisma.user.findUnique({ where: { clerkUserId } });
+  if (!user) throw new Error("User not found");
+
+  // Verify the market asset exists
+  const marketAsset = await prisma.marketAsset.findUnique({
+    where: { id: data.marketAssetId },
+  });
+  if (!marketAsset) throw new Error("Market asset not found");
+
+  const existing = await prisma.userMarketAsset.findUnique({
+    where: {
+      userId_marketAssetId: {
+        userId: user.id,
+        marketAssetId: data.marketAssetId,
+      },
+    },
+  });
+
+  if (existing) {
+    return prisma.userMarketAsset.update({
+      where: { id: existing.id },
+      data: {
+        quantity: data.quantity,
+        averageCost: data.averageCost,
+      },
+      include: { marketAsset: true },
+    });
+  }
+
+  return prisma.userMarketAsset.create({
+    data: {
+      userId: user.id,
+      marketAssetId: data.marketAssetId,
+      quantity: data.quantity,
+      averageCost: data.averageCost,
+    },
+    include: { marketAsset: true },
+  });
+};
+
+/**
+ * Get all UserMarketAssets (holdings) for a user.
+ */
+export const getUserMarketAssetsService = async (clerkUserId: string) => {
+  const user = await prisma.user.findUnique({ where: { clerkUserId } });
+  if (!user) throw new Error("User not found");
+
+  return prisma.userMarketAsset.findMany({
+    where: { userId: user.id },
+    include: { marketAsset: true },
+    orderBy: { createdAt: "desc" },
+  });
+};
+
+/**
+ * Delete a UserMarketAsset for a user.
+ */
+export const deleteUserMarketAssetService = async (
+  clerkUserId: string,
+  userMarketAssetId: string
+) => {
+  const user = await prisma.user.findUnique({ where: { clerkUserId } });
+  if (!user) throw new Error("User not found");
+
+  const record = await prisma.userMarketAsset.findFirst({
+    where: { id: userMarketAssetId, userId: user.id },
+  });
+  if (!record) throw new Error("User market asset not found or does not belong to user");
+
+  // Remove from all portfolio join records first
+  await prisma.portfolioMarketAsset.deleteMany({
+    where: { userMarketAssetId },
+  });
+
+  await prisma.userMarketAsset.delete({ where: { id: userMarketAssetId } });
+};
+
+// ─────────────────────────────────────────────
+// Portfolio ↔ UserMarketAsset link management
+// ─────────────────────────────────────────────
+
+/**
+ * Add a UserMarketAsset to a portfolio.
+ */
+export const addMarketAssetToPortfolioService = async (
+  clerkUserId: string,
+  portfolioId: string,
+  userMarketAssetId: string
+) => {
+  const user = await prisma.user.findUnique({ where: { clerkUserId } });
+  if (!user) throw new Error("User not found");
+
+  // Verify portfolio belongs to user
+  const portfolio = await prisma.portfolio.findFirst({
+    where: { id: portfolioId, userId: user.id },
+  });
+  if (!portfolio) throw new Error("Portfolio not found or does not belong to user");
+
+  // Verify UserMarketAsset belongs to user
+  const userMarketAsset = await prisma.userMarketAsset.findFirst({
+    where: { id: userMarketAssetId, userId: user.id },
+  });
+  if (!userMarketAsset) throw new Error("User market asset not found or does not belong to user");
+
+  return prisma.portfolioMarketAsset.create({
+    data: { portfolioId, userMarketAssetId },
+  });
+};
+
+/**
+ * Get all market assets linked to a portfolio.
+ */
+export const getPortfolioMarketAssetsService = async (
   clerkUserId: string,
   portfolioId: string
 ) => {
   const user = await prisma.user.findUnique({ where: { clerkUserId } });
   if (!user) throw new Error("User not found");
 
-  // Verify the portfolio belongs to this user
   const portfolio = await prisma.portfolio.findFirst({
     where: { id: portfolioId, userId: user.id },
   });
-  if (!portfolio)
-    throw new Error("Portfolio not found or does not belong to user");
+  if (!portfolio) throw new Error("Portfolio not found or does not belong to user");
 
-  // Fetch all transactions for accounts in this portfolio
-  const transactions = await prisma.transaction.findMany({
-    where: {
-      account: { portfolioId },
-    },
+  return prisma.portfolioMarketAsset.findMany({
+    where: { portfolioId },
     include: {
-      marketAsset: true,
+      userMarketAsset: {
+        include: { marketAsset: true },
+      },
     },
-    orderBy: { executedAt: "asc" },
   });
-
-  // Compute holdings in-memory
-  const holdingsMap = new Map<
-    string,
-    {
-      marketAssetId: string;
-      symbol: string;
-      assetName: string;
-      quantity: number;
-      totalCost: number;
-    }
-  >();
-
-  for (const tx of transactions) {
-    const { marketAssetId } = tx;
-
-    if (!holdingsMap.has(marketAssetId)) {
-      holdingsMap.set(marketAssetId, {
-        marketAssetId,
-        symbol: tx.marketAsset.symbol,
-        assetName: tx.marketAsset.name,
-        quantity: 0,
-        totalCost: 0,
-      });
-    }
-
-    const holding = holdingsMap.get(marketAssetId)!;
-
-    if (tx.type === "BUY") {
-      holding.quantity += Number(tx.quantity);
-      holding.totalCost += Number(tx.quantity) * Number(tx.price);
-    }
-
-    if (tx.type === "SELL") {
-      holding.quantity -= Number(tx.quantity);
-    }
-  }
-
-  // Filter out zero/negative holdings and compute averageCost
-  const finalHoldings = Array.from(holdingsMap.values())
-    .filter((h) => h.quantity > 0)
-    .map((h) => ({
-      marketAssetId: h.marketAssetId,
-      symbol: h.symbol,
-      assetName: h.assetName,
-      quantity: h.quantity,
-      averageCost: h.totalCost / h.quantity,
-    }));
-
-  return finalHoldings;
 };
 
-export const getUserHoldingsService = async (
-  clerkUserId: string
+/**
+ * Remove a market asset from a portfolio (does not delete the UserMarketAsset itself).
+ */
+export const removeMarketAssetFromPortfolioService = async (
+  clerkUserId: string,
+  portfolioId: string,
+  userMarketAssetId: string
 ) => {
-  const user = await prisma.user.findUnique({
-    where: { clerkUserId },
+  const user = await prisma.user.findUnique({ where: { clerkUserId } });
+  if (!user) throw new Error("User not found");
+
+  const portfolio = await prisma.portfolio.findFirst({
+    where: { id: portfolioId, userId: user.id },
   });
+  if (!portfolio) throw new Error("Portfolio not found or does not belong to user");
 
-  if (!user) {
-    throw new Error("User not found");
-  }
-
-  const portfolios = await prisma.portfolio.findMany({
+  await prisma.portfolioMarketAsset.delete({
     where: {
-      userId: user.id,
+      portfolioId_userMarketAssetId: { portfolioId, userMarketAssetId },
     },
   });
-
-  const holdings = [];
-
-  for (const portfolio of portfolios) {
-    const portfolioHoldings =
-      await getPortfolioHoldingsService(
-        clerkUserId,
-        portfolio.id
-      );
-
-    holdings.push(...portfolioHoldings);
-  }
-
-  return holdings;
 };

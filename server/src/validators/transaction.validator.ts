@@ -2,10 +2,11 @@ import { z } from "zod";
 
 export const createTransactionSchema = z.object({
   accountId: z.string().min(1),
-  marketAssetId: z.string().min(1),
-  type: z.enum(["BUY", "SELL", "DIVIDEND", "DEPOSIT", "WITHDRAWAL"]),
-  quantity: z.number().positive(),
-  price: z.number().positive(),
+  marketAssetId: z.string().min(1).optional(),
+  type: z.enum(["BUY", "SELL", "DIVIDEND", "DEPOSIT", "WITHDRAWAL", "INTEREST", "TRANSFER"]),
+  quantity: z.number().positive().optional(),
+  price: z.number().positive().optional(),
+  amount: z.number().positive().optional(),
   fees: z.number().min(0).optional(),
   currency: z.string().min(3).max(5),
   executedAt: z.string().datetime(),

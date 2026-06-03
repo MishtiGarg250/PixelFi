@@ -2,10 +2,11 @@ import prisma from "../lib/prisma.js";
 
 interface CreateTransactionInput {
   accountId: string;
-  marketAssetId: string;
-  type: "BUY" | "SELL" | "DEPOSIT" | "WITHDRAWAL" | "DIVIDEND";
-  quantity: number;
-  price: number;
+  marketAssetId?: string;
+  type: "BUY" | "SELL" | "DEPOSIT" | "WITHDRAWAL" | "DIVIDEND" | "INTEREST" | "TRANSFER";
+  quantity?: number;
+  price?: number;
+  amount?: number;
   fees?: number | undefined;
   currency: string;
   executedAt: string;
@@ -13,41 +14,37 @@ interface CreateTransactionInput {
 
 export const createTransactionService = async (
   clerkUserId: string,
-  portfolioId: string,
   data: CreateTransactionInput
 ) => {
   // Resolve user
   const user = await prisma.user.findUnique({ where: { clerkUserId } });
   if (!user) throw new Error("User not found");
 
-  // Verify portfolio belongs to user
-  const portfolio = await prisma.portfolio.findFirst({
-    where: { id: portfolioId, userId: user.id },
-  });
-  if (!portfolio)
-    throw new Error("Portfolio not found or does not belong to user");
-
-  // Verify account belongs to this portfolio
+  // Verify account belongs to this user
   const account = await prisma.account.findFirst({
-    where: { id: data.accountId, portfolioId },
+    where: { id: data.accountId, userId: user.id },
   });
   if (!account)
-    throw new Error("Account not found or does not belong to this portfolio");
+    throw new Error("Account not found or does not belong to user");
 
-  // Verify market asset exists
-  const marketAsset = await prisma.marketAsset.findUnique({
-    where: { id: data.marketAssetId },
-  });
-  if (!marketAsset) throw new Error("Market asset not found");
+  // If marketAssetId provided, verify it exists
+  if (data.marketAssetId) {
+    const marketAsset = await prisma.marketAsset.findUnique({
+      where: { id: data.marketAssetId },
+    });
+    if (!marketAsset) throw new Error("Market asset not found");
+  }
 
   // Create transaction
   const transaction = await prisma.transaction.create({
     data: {
+      userId: user.id,
       accountId: data.accountId,
-      marketAssetId: data.marketAssetId,
+      marketAssetId: data.marketAssetId ?? null,
       type: data.type,
-      quantity: data.quantity,
-      price: data.price,
+      quantity: data.quantity ?? null,
+      price: data.price ?? null,
+      amount: data.amount ?? null,
       fees: data.fees ?? 0,
       currency: data.currency,
       executedAt: new Date(data.executedAt),
@@ -61,24 +58,38 @@ export const createTransactionService = async (
   return transaction;
 };
 
-export const getPortfolioTransactionsService = async (
+export const getUserTransactionsService = async (clerkUserId: string) => {
+  const user = await prisma.user.findUnique({ where: { clerkUserId } });
+  if (!user) throw new Error("User not found");
+
+  const transactions = await prisma.transaction.findMany({
+    where: { userId: user.id },
+    include: {
+      marketAsset: true,
+      account: true,
+    },
+    orderBy: { executedAt: "desc" },
+  });
+
+  return transactions;
+};
+
+export const getAccountTransactionsService = async (
   clerkUserId: string,
-  portfolioId: string
+  accountId: string
 ) => {
   const user = await prisma.user.findUnique({ where: { clerkUserId } });
   if (!user) throw new Error("User not found");
 
-  // Verify portfolio belongs to user
-  const portfolio = await prisma.portfolio.findFirst({
-    where: { id: portfolioId, userId: user.id },
+  // Verify account belongs to user
+  const account = await prisma.account.findFirst({
+    where: { id: accountId, userId: user.id },
   });
-  if (!portfolio)
-    throw new Error("Portfolio not found or does not belong to user");
+  if (!account)
+    throw new Error("Account not found or does not belong to user");
 
   const transactions = await prisma.transaction.findMany({
-    where: {
-      account: { portfolioId },
-    },
+    where: { accountId },
     include: {
       marketAsset: true,
       account: true,

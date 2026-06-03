@@ -61,6 +61,7 @@ interface CreateCustomAssetInput {
   purchasePrice?: number | undefined;
   purchaseDate?: string | undefined;
   currency: string;
+  portfolioId?: string | undefined;
 }
 
 interface UpdateCustomAssetInput {
@@ -78,47 +79,49 @@ interface UpdateCustomAssetInput {
   purchasePrice?: number | undefined;
   purchaseDate?: string | undefined;
   currency?: string | undefined;
+  portfolioId?: string | null | undefined;
 }
 
-async function resolveUserAndPortfolio(
-  clerkUserId: string,
-  portfolioId: string
-) {
+async function resolveUser(clerkUserId: string) {
   const user = await prisma.user.findUnique({ where: { clerkUserId } });
   if (!user) throw new Error("User not found");
-
-  const portfolio = await prisma.portfolio.findFirst({
-    where: { id: portfolioId, userId: user.id },
-  });
-  if (!portfolio)
-    throw new Error("Portfolio not found or does not belong to user");
-
-  return { user, portfolio };
+  return user;
 }
 
 export const getCustomAssetsService = async (
   clerkUserId: string,
-  portfolioId: string
+  portfolioId?: string
 ) => {
-  await resolveUserAndPortfolio(clerkUserId, portfolioId);
+  const user = await resolveUser(clerkUserId);
 
   return prisma.customAsset.findMany({
-    where: { portfolioId },
+    where: {
+      userId: user.id,
+      ...(portfolioId !== undefined && { portfolioId }),
+    },
     orderBy: { createdAt: "desc" },
   });
 };
 
 export const createCustomAssetService = async (
   clerkUserId: string,
-  portfolioId: string,
   data: CreateCustomAssetInput
 ) => {
-  const { user } = await resolveUserAndPortfolio(clerkUserId, portfolioId);
+  const user = await resolveUser(clerkUserId);
+
+  // Optionally validate that portfolioId belongs to user
+  if (data.portfolioId) {
+    const portfolio = await prisma.portfolio.findFirst({
+      where: { id: data.portfolioId, userId: user.id },
+    });
+    if (!portfolio)
+      throw new Error("Portfolio not found or does not belong to user");
+  }
 
   return prisma.customAsset.create({
     data: {
       userId: user.id,
-      portfolioId,
+      portfolioId: data.portfolioId ?? null,
 
       name: data.name,
       category: data.category,
@@ -136,18 +139,26 @@ export const createCustomAssetService = async (
 
 export const updateCustomAssetService = async (
   clerkUserId: string,
-  portfolioId: string,
   assetId: string,
   data: UpdateCustomAssetInput
 ) => {
-  const { user } = await resolveUserAndPortfolio(clerkUserId, portfolioId);
+  const user = await resolveUser(clerkUserId);
 
   // Verify ownership
   const existing = await prisma.customAsset.findFirst({
-    where: { id: assetId, portfolioId, userId: user.id },
+    where: { id: assetId, userId: user.id },
   });
   if (!existing)
-    throw new Error("Custom asset not found or does not belong to this portfolio");
+    throw new Error("Custom asset not found or does not belong to user");
+
+  // Optionally validate new portfolioId
+  if (data.portfolioId) {
+    const portfolio = await prisma.portfolio.findFirst({
+      where: { id: data.portfolioId, userId: user.id },
+    });
+    if (!portfolio)
+      throw new Error("Portfolio not found or does not belong to user");
+  }
 
   return prisma.customAsset.update({
     where: { id: assetId },
@@ -161,22 +172,22 @@ export const updateCustomAssetService = async (
         purchaseDate: new Date(data.purchaseDate),
       }),
       ...(data.currency !== undefined && { currency: data.currency }),
+      ...(data.portfolioId !== undefined && { portfolioId: data.portfolioId }),
     },
   });
 };
 
 export const deleteCustomAssetService = async (
   clerkUserId: string,
-  portfolioId: string,
   assetId: string
 ) => {
-  const { user } = await resolveUserAndPortfolio(clerkUserId, portfolioId);
+  const user = await resolveUser(clerkUserId);
 
   const existing = await prisma.customAsset.findFirst({
-    where: { id: assetId, portfolioId, userId: user.id },
+    where: { id: assetId, userId: user.id },
   });
   if (!existing)
-    throw new Error("Custom asset not found or does not belong to this portfolio");
+    throw new Error("Custom asset not found or does not belong to user");
 
   await prisma.customAsset.delete({ where: { id: assetId } });
 };

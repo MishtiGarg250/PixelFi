@@ -49,7 +49,8 @@ export const getCustomAssets = async (req: Request, res: Response) => {
     const { userId } = getAuth(req);
     if (!userId) return res.status(401).json({ message: "Unauthorized" });
 
-    const  portfolioId  = req.params.portfolioId as string;
+    // Optional filter by portfolioId from query param
+    const portfolioId = req.query.portfolioId as string | undefined;
     const assets = await getCustomAssetsService(userId, portfolioId);
     return res.status(200).json({ success: true, assets });
   } catch (error) {
@@ -60,13 +61,11 @@ export const getCustomAssets = async (req: Request, res: Response) => {
 
 export const createCustomAsset = async (req: Request, res: Response) => {
   try {
-    const userId  = getAuth(req).userId as string;
+    const userId = getAuth(req).userId as string;
     if (!userId) return res.status(401).json({ message: "Unauthorized" });
 
-    
-    const portfolioId = req.params.portfolioId as string;
     const validatedData = createCustomAssetSchema.parse(req.body);
-    const asset = await createCustomAssetService(userId, portfolioId, validatedData);
+    const asset = await createCustomAssetService(userId, validatedData);
     return res.status(201).json({ success: true, asset });
   } catch (error) {
     console.error(error);
@@ -76,13 +75,12 @@ export const createCustomAsset = async (req: Request, res: Response) => {
 
 export const updateCustomAsset = async (req: Request, res: Response) => {
   try {
-    const userId  = getAuth(req).userId as string;
+    const userId = getAuth(req).userId as string;
     if (!userId) return res.status(401).json({ message: "Unauthorized" });
 
-    const assetId  = req.params.assetId as string;
-    const portfolioId = req.params.portfolioId as string;
+    const assetId = req.params.assetId as string;
     const validatedData = updateCustomAssetSchema.parse(req.body);
-    const asset = await updateCustomAssetService(userId, portfolioId, assetId, validatedData);
+    const asset = await updateCustomAssetService(userId, assetId, validatedData);
     return res.status(200).json({ success: true, asset });
   } catch (error) {
     console.error(error);
@@ -92,12 +90,11 @@ export const updateCustomAsset = async (req: Request, res: Response) => {
 
 export const deleteCustomAsset = async (req: Request, res: Response) => {
   try {
-    const userId  = getAuth(req).userId as string;
+    const userId = getAuth(req).userId as string;
     if (!userId) return res.status(401).json({ message: "Unauthorized" });
 
-    const assetId  = req.params.assetId as string;
-    const portfolioId = req.params.portfolioId as string;
-    await deleteCustomAssetService(userId, portfolioId, assetId);
+    const assetId = req.params.assetId as string;
+    await deleteCustomAssetService(userId, assetId);
     return res.status(200).json({ success: true, message: "Custom asset deleted" });
   } catch (error) {
     console.error(error);

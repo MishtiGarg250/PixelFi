@@ -14,49 +14,46 @@ export const createPortfolioService = async (
   userId: string,
   data: CreatePortfolioInput
 ) => {
-  const portfolio =
-    await prisma.portfolio.create({
-      data: {
-        name: data.name,
-        description: data.description ?? null,
+  const portfolio = await prisma.portfolio.create({
+    data: {
+      name: data.name,
+      description: data.description ?? null,
 
-        user: {
-          connect: {
-            clerkUserId: userId,
-          },
+      user: {
+        connect: {
+          clerkUserId: userId,
         },
       },
-    });
+    },
+  });
 
   return portfolio;
 };
 
-export const getUserPortfoliosService =
-  async (userId: string) => {
-    const portfolios =
-      await prisma.portfolio.findMany({
-        where: {
-          user: {
-            clerkUserId: userId,
-          },
-        },
+export const getUserPortfoliosService = async (userId: string) => {
+  const portfolios = await prisma.portfolio.findMany({
+    where: {
+      user: {
+        clerkUserId: userId,
+      },
+    },
 
-        orderBy: {
-          createdAt: "desc",
-        },
+    orderBy: {
+      createdAt: "desc",
+    },
 
-        include: {
-          _count: {
-            select: {
-              accounts: true,
-              holdings: true,
-            },
-          },
+    include: {
+      _count: {
+        select: {
+          customAssets: true,
+          marketAssets: true,
         },
-      });
+      },
+    },
+  });
 
-    return portfolios;
-  };
+  return portfolios;
+};
 
 export const getPortfolioByIdService = async (
   userId: string,
@@ -70,8 +67,8 @@ export const getPortfolioByIdService = async (
     include: {
       _count: {
         select: {
-          accounts: true,
-          holdings: true,
+          customAssets: true,
+          marketAssets: true,
         },
       },
     },
@@ -117,14 +114,8 @@ export const deletePortfolioService = async (
   });
   if (!portfolio) throw new Error("Portfolio not found or does not belong to user");
 
-  // Cascade: delete all transactions in accounts belonging to this portfolio
-  const accounts = await prisma.account.findMany({ where: { portfolioId } });
-  for (const account of accounts) {
-    await prisma.transaction.deleteMany({ where: { accountId: account.id } });
-  }
-
-  await prisma.account.deleteMany({ where: { portfolioId } });
-  await prisma.holding.deleteMany({ where: { portfolioId } });
+  // Cascade: remove portfolio-market-asset join records
+  await prisma.portfolioMarketAsset.deleteMany({ where: { portfolioId } });
   await prisma.customAsset.deleteMany({ where: { portfolioId } });
   await prisma.portfolio.delete({ where: { id: portfolioId } });
 };

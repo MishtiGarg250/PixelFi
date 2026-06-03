@@ -24,6 +24,7 @@ export const createCustomAssetSchema = z.object({
   purchasePrice: z.number().positive().optional(),
   purchaseDate: z.string().datetime().optional(),
   currency: z.string().min(3).max(5),
+  portfolioId: z.string().optional(),
 });
 
 export const updateCustomAssetSchema = z.object({
@@ -43,4 +44,5 @@ export const updateCustomAssetSchema = z.object({
   purchasePrice: z.number().positive().optional(),
   purchaseDate: z.string().datetime().optional(),
   currency: z.string().min(3).max(5).optional(),
+  portfolioId: z.string().nullable().optional(),
 });

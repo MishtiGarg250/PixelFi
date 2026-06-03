@@ -1,10 +1,29 @@
 import express from "express";
 import { protect } from "../middleware/auth.middleware.js";
-import { getPortfolioHoldings } from "../controllers/holdings.controller.js";
+import {
+  getUserMarketAssets,
+  upsertUserMarketAsset,
+  deleteUserMarketAsset,
+  getPortfolioMarketAssets,
+  addMarketAssetToPortfolio,
+  removeMarketAssetFromPortfolio,
+} from "../controllers/holdings.controller.js";
 
-// Mounted at /api/portfolios/:portfolioId/holdings
-const router = express.Router({ mergeParams: true });
+// ─────────────────────────────────────────────
+// User-level market asset holdings — mounted at /api/holdings
+// ─────────────────────────────────────────────
+export const holdingsRouter = express.Router();
 
-router.get("/", protect, getPortfolioHoldings);
+holdingsRouter.get("/", protect, getUserMarketAssets);
+holdingsRouter.post("/", protect, upsertUserMarketAsset);
+holdingsRouter.delete("/:userMarketAssetId", protect, deleteUserMarketAsset);
 
-export default router;
+// ─────────────────────────────────────────────
+// Portfolio ↔ market asset links — nested under /api/portfolios/:portfolioId/holdings
+// Uses mergeParams to inherit :portfolioId
+// ─────────────────────────────────────────────
+export const portfolioHoldingsRouter = express.Router({ mergeParams: true });
+
+portfolioHoldingsRouter.get("/", protect, getPortfolioMarketAssets);
+portfolioHoldingsRouter.post("/", protect, addMarketAssetToPortfolio);
+portfolioHoldingsRouter.delete("/:userMarketAssetId", protect, removeMarketAssetFromPortfolio);

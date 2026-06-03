@@ -2,15 +2,15 @@ import express from "express";
 import { protect } from "../middleware/auth.middleware.js";
 import {
   createAccount,
-  getPortfolioAccounts,
+  getUserAccounts,
   deleteAccount,
 } from "../controllers/account.controller.js";
 
-// Mounted at /api/portfolios/:portfolioId/accounts
-const router = express.Router({ mergeParams: true });
+// Mounted at /api/accounts
+const router = express.Router();
 
 router.post("/", protect, createAccount);
-router.get("/", protect, getPortfolioAccounts);
+router.get("/", protect, getUserAccounts);
 router.delete("/:accountId", protect, deleteAccount);
 
 export default router;
