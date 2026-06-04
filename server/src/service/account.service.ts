@@ -7,9 +7,6 @@ interface CreateAccountInput {
   currency: string;
 }
 
-/**
- * Resolve clerkUserId → internal user.
- */
 async function resolveUser(clerkUserId: string) {
   const user = await prisma.user.findUnique({ where: { clerkUserId } });
   if (!user) throw new Error("User not found");
