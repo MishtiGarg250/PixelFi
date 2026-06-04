@@ -9,8 +9,6 @@ import {
   createCustomAsset,
   updateCustomAsset,
   deleteCustomAsset,
-  type MarketAsset,
-  type CustomAsset,
   type CreateMarketAssetInput,
   type CreateCustomAssetInput,
   type UpdateCustomAssetInput,
@@ -53,7 +51,7 @@ export function useCustomAssets(portfolioId?: string) {
       const api = await getApi();
       return getCustomAssets(api, portfolioId);
     },
-    enabled: portfolioId !== undefined,
+    enabled: true,
   });
 
   const create = useMutation({

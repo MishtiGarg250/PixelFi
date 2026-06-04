@@ -10,7 +10,7 @@ import {
 } from "@/services/account.service";
 import { queryKeys } from "@/lib/queryKeys";
 
-export function useAccounts(portfolioId?: string) {
+export function useAccounts() {
   const { getApi } = useApi();
   const queryClient = useQueryClient();
 

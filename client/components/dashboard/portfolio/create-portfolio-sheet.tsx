@@ -86,7 +86,7 @@ export function CreatePortfolioSheet({ open, onClose, onSuccess }: CreatePortfol
             <button
               type="submit"
               disabled={create.isPending || !name.trim()}
-              className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#b5b5f6] to-[#f7bff4] py-2.5 text-sm font-medium text-black transition hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-linear-to-r from-[#b5b5f6] to-[#f7bff4] py-2.5 text-sm font-medium text-black transition hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {create.isPending ? (
                 <><Loader2 size={14} className="animate-spin" /> Creating...</>

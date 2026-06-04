@@ -4,6 +4,7 @@ import "./globals.css";
 import { ClerkProvider } from "@clerk/nextjs";
 import { QueryProvider } from "@/providers/query-provider";
 import { ClerkAxiosProvider } from "@/providers/clerk-axios-provider";
+import { Toaster } from "sonner";
 
 const poppins = Poppins({
   subsets: ["latin"],
@@ -27,6 +28,7 @@ export default function RootLayout({
           <QueryProvider>
             <ClerkAxiosProvider>
               {children}
+              <Toaster theme="dark" richColors position="top-right" />
             </ClerkAxiosProvider>
           </QueryProvider>
         </body>

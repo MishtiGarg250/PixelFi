@@ -7,7 +7,6 @@ import {
   createLiability,
   updateLiability,
   deleteLiability,
-  type Liability,
   type CreateLiabilityInput,
   type UpdateLiabilityInput,
 } from "@/services/liability.service";
