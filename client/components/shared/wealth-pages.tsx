@@ -191,7 +191,7 @@ function Panel({ children, className }: { children: React.ReactNode; className?:
 
 function EmptyState({ icon, title: heading, description }: { icon: React.ReactNode; title: string; description: string }) {
   return (
-    <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-white/10 bg-white/[0.02] px-5 py-16 text-center">
+    <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-white/10 bg-white/2 px-5 py-16 text-center">
       <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl border border-white/8 bg-white/3 text-neutral-500">{icon}</div>
       <h3 className="text-sm font-semibold text-white">{heading}</h3>
       <p className="mt-1 max-w-sm text-sm leading-6 text-neutral-500">{description}</p>
@@ -273,9 +273,16 @@ const accountSchema = z.object({
 });
 
 function AccountForm({ onSubmit, pending }: { onSubmit: (data: z.infer<typeof accountSchema>) => void; pending: boolean }) {
-  const form = useForm<z.infer<typeof accountSchema>>({
-    resolver: zodResolver(accountSchema),
-    defaultValues: { name: "", brokerName: "", accountType: "BROKERAGE", currency: "USD" },
+  type AccountFormValues = z.infer<typeof accountSchema>;
+
+  const form = useForm<AccountFormValues>({
+    resolver: zodResolver(accountSchema) as any,
+    defaultValues: {
+      name: "",
+      brokerName: "",
+      accountType: "BROKERAGE",
+      currency: "USD",
+    },
   });
 
   return (
@@ -354,14 +361,16 @@ function LiabilityForm({
   onSubmit: (data: z.infer<typeof liabilitySchema>) => void;
   pending: boolean;
 }) {
-  const form = useForm<z.infer<typeof liabilitySchema>>({
-    resolver: zodResolver(liabilitySchema),
+  type LiabilityFormValues = z.infer<typeof liabilitySchema>;
+
+  const form = useForm<LiabilityFormValues>({
+    resolver: zodResolver(liabilitySchema) as any,
     defaultValues: {
       name: initial?.name ?? "",
       type: initial?.type ?? "OTHER",
       originalAmount: initial?.originalAmount ?? 0,
       outstanding: initial?.outstanding ?? 0,
-      interestRate: initial?.interestRate ?? 0,
+      interestRate: initial?.interestRate ?? undefined,
       currency: initial?.currency ?? "USD",
     },
   });
@@ -439,17 +448,28 @@ function CustomAssetForm({
   onSubmit: (data: CreateCustomAssetInput | UpdateCustomAssetInput) => void;
   pending: boolean;
 }) {
-  const form = useForm<z.infer<typeof customAssetSchema>>({
-    resolver: zodResolver(customAssetSchema),
+  type CustomAssetFormValues = z.infer<typeof customAssetSchema>;
+
+  const form = useForm<CustomAssetFormValues>({
+    resolver: zodResolver(customAssetSchema) as any,
     defaultValues: {
       name: initial?.name ?? "",
       description: initial?.description ?? "",
       category: initial?.category ?? "OTHER",
       currentValue: initial?.currentValue ?? 0,
-      purchasePrice: initial?.purchasePrice ?? 0,
-      purchaseDate: initial?.purchaseDate ? initial.purchaseDate.slice(0, 10) : "",
       currency: initial?.currency ?? "USD",
-      portfolioId: initial?.portfolioId ?? "",
+
+      ...(initial?.purchasePrice != null && {
+        purchasePrice: initial.purchasePrice,
+      }),
+
+      ...(initial?.purchaseDate && {
+        purchaseDate: initial.purchaseDate.slice(0, 10),
+      }),
+
+      ...(initial?.portfolioId && {
+        portfolioId: initial.portfolioId,
+      }),
     },
   });
   return (
@@ -515,15 +535,13 @@ function TransactionForm({
   onSubmit: (data: z.infer<typeof transactionSchema>) => void;
   pending: boolean;
 }) {
-  const form = useForm<z.infer<typeof transactionSchema>>({
-    resolver: zodResolver(transactionSchema),
+  type TransactionFormValues = z.infer<typeof transactionSchema>;
+
+  const form = useForm<TransactionFormValues>({
+    resolver: zodResolver(transactionSchema) as any,
     defaultValues: {
       accountId: accounts[0]?.id ?? "",
       type: "BUY",
-      quantity: 0,
-      price: 0,
-      amount: 0,
-      fees: 0,
       currency: "USD",
       executedAt: new Date().toISOString().slice(0, 10),
     },
@@ -582,9 +600,9 @@ function TransactionForm({
 function TransactionsTable({ transactions }: { transactions: Transaction[] }) {
   return (
     <div className="overflow-x-auto rounded-2xl border border-white/5 bg-neutral-950/20">
-      <table className="w-full min-w-[860px] border-collapse text-left text-sm">
+      <table className="w-full min-w-215 border-collapse text-left text-sm">
         <thead>
-          <tr className="border-b border-white/5 bg-white/[0.01] text-xs uppercase tracking-wider text-neutral-500">
+          <tr className="border-b border-white/5 bg-white/1 text-xs uppercase tracking-wider text-neutral-500">
             {["Date", "Type", "Asset", "Account", "Quantity", "Price", "Amount", "Fees"].map((head) => (
               <th key={head} className="p-4 font-medium">{head}</th>
             ))}
@@ -592,7 +610,7 @@ function TransactionsTable({ transactions }: { transactions: Transaction[] }) {
         </thead>
         <tbody className="divide-y divide-white/5">
           {transactions.map((tx) => (
-            <tr key={tx.id} className="transition hover:bg-white/[0.015]">
+            <tr key={tx.id} className="transition hover:bg-white/1">
               <td className="p-4 text-xs text-neutral-500">{date(tx.executedAt)}</td>
               <td className="p-4"><span className="rounded-full border border-white/8 bg-white/3 px-2 py-1 text-[11px] text-neutral-300">{title(tx.type)}</span></td>
               <td className="p-4"><p className="font-medium text-white">{tx.marketAsset?.symbol ?? "Cash"}</p><p className="text-xs text-neutral-500">{tx.marketAsset?.name ?? "No linked asset"}</p></td>
@@ -666,7 +684,7 @@ export function DashboardPage() {
           {(netWorth.data?.holdings ?? []).length ? (
             <div className="space-y-3">
               {(netWorth.data?.holdings ?? []).slice(0, 5).map((holding) => (
-                <div key={holding.marketAssetId} className="flex items-center justify-between rounded-xl border border-white/5 bg-white/[0.02] p-3">
+                <div key={holding.marketAssetId} className="flex items-center justify-between rounded-xl border border-white/5 bg-white/2 p-3">
                   <div><p className="text-sm font-medium text-white">{holding.symbol}</p><p className="text-xs text-neutral-500">{holding.assetName}</p></div>
                   <p className="text-sm font-semibold text-[#b5b5f6]">{money(holding.currentValue)}</p>
                 </div>
@@ -682,8 +700,8 @@ export function DashboardPage() {
       <Panel>
         <h2 className="text-sm font-semibold text-white">Insights</h2>
         <div className="mt-4 grid gap-4 md:grid-cols-2">
-          <div className="rounded-xl border border-white/5 bg-white/[0.02] p-4 text-sm leading-6 text-neutral-400">Investment summary: {performance.data?.length ? `You are tracking ${performance.data.length} priced positions with aggregate net worth of ${money(netWorth.data?.totalNetWorth)}.` : "Add transactions and holdings to unlock portfolio-level insights."}</div>
-          <div className="rounded-xl border border-white/5 bg-white/[0.02] p-4 text-sm leading-6 text-neutral-400">Asset distribution: {allocation.data?.length ? `${allocation.data[0]?.symbol ?? "Top asset"} currently leads allocation exposure.` : "Allocation data will appear once holdings are available."}</div>
+          <div className="rounded-xl border border-white/5 bg-white/2 p-4 text-sm leading-6 text-neutral-400">Investment summary: {performance.data?.length ? `You are tracking ${performance.data.length} priced positions with aggregate net worth of ${money(netWorth.data?.totalNetWorth)}.` : "Add transactions and holdings to unlock portfolio-level insights."}</div>
+          <div className="rounded-xl border border-white/5 bg-white/2 p-4 text-sm leading-6 text-neutral-400">Asset distribution: {allocation.data?.length ? `${allocation.data[0]?.symbol ?? "Top asset"} currently leads allocation exposure.` : "Allocation data will appear once holdings are available."}</div>
         </div>
       </Panel>
     </div>
@@ -871,7 +889,7 @@ export function PortfolioDetailPage({ portfolioId }: { portfolioId: string }) {
       <PageHeader title={portfolio.data.name} description={portfolio.data.description || "No description provided."} />
       <div className="grid grid-cols-1 gap-4 md:grid-cols-3"><StatCard label="Asset Count" value={assetCount} /><StatCard label="Portfolio Value" value={money(portfolioValue)} color="text-[#b5b5f6]" /><StatCard label="Created" value={date(portfolio.data.createdAt)} /></div>
       <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
-        <Panel><h2 className="mb-4 text-sm font-semibold text-white">Custom Assets</h2>{customAssets.data?.length ? <div className="space-y-3">{customAssets.data.map((asset) => <div key={asset.id} className="flex justify-between rounded-xl border border-white/5 bg-white/[0.02] p-3"><span className="text-sm text-white">{asset.name}</span><span className="text-sm text-[#b5b5f6]">{money(asset.currentValue, asset.currency)}</span></div>)}</div> : <EmptyState icon={<Database size={18} />} title="No custom assets" description="Assigned custom assets will appear here." />}</Panel>
+        <Panel><h2 className="mb-4 text-sm font-semibold text-white">Custom Assets</h2>{customAssets.data?.length ? <div className="space-y-3">{customAssets.data.map((asset) => <div key={asset.id} className="flex justify-between rounded-xl border border-white/5 bg-white/2 p-3"><span className="text-sm text-white">{asset.name}</span><span className="text-sm text-[#b5b5f6]">{money(asset.currentValue, asset.currency)}</span></div>)}</div> : <EmptyState icon={<Database size={18} />} title="No custom assets" description="Assigned custom assets will appear here." />}</Panel>
         <Panel><h2 className="mb-4 text-sm font-semibold text-white">Allocation Chart</h2><div className="h-72">{allocation.data?.length ? <ResponsiveContainer><PieChart><Pie data={allocation.data} dataKey="currentValue" nameKey="symbol" innerRadius={58} outerRadius={95}>{allocation.data.map((_, index) => <Cell key={index} fill={accent[index % accent.length]} />)}</Pie><Tooltip contentStyle={{ background: "#0a0a0a", border: "1px solid rgba(255,255,255,.08)", borderRadius: 12 }} /></PieChart></ResponsiveContainer> : <EmptyState icon={<BarChart3 size={18} />} title="Allocation unavailable" description="Allocation appears when analytics data is available." />}</div></Panel>
       </div>
       <Panel><h2 className="mb-4 text-sm font-semibold text-white">Market Assets</h2><EmptyState icon={<LineChart size={18} />} title="No market asset details" description="Market holdings will appear when the backend exposes portfolio-level holdings." /></Panel>
