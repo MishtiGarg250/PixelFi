@@ -19,7 +19,7 @@ const links = [
   { label: "Portfolios", href: "/dashboard/portfolios", icon: Briefcase },
   { label: "Accounts", href: "/dashboard/accounts", icon: Wallet },
   { label: "Transactions", href: "/dashboard/transactions", icon: ArrowLeftRight },
-  { label: "Holdings", href: "/dashboard/holdings", icon: PieChart },
+  { label: "Assets", href: "/dashboard/assets", icon: PieChart },
   { label: "Analytics", href: "/dashboard/analytics", icon: LineChart },
   {label:"Market", href:"/dashboard/market", icon: LineChart},
   {label: "Settings", href:"/dashboard/settings", icon: Settings}

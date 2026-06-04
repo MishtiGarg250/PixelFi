@@ -1,25 +1,31 @@
 "use client";
-import { useQuery } from "@tanstack/react-query";
-import { useAuth } from "@clerk/nextjs";
-import axios from "axios";
 
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useApi } from "./useApi";
+import { getCurrentUser, type User } from "@/services/user.service";
+import { queryKeys } from "@/lib/queryKeys";
 
 export function useUser() {
-    const { getToken } = useAuth();
-    return useQuery({
+  const { getApi } = useApi();
+  const queryClient = useQueryClient();
 
-        queryKey: ["user"],
-        queryFn: async () => {
-            const token = await getToken();
-            const res = await axios.get(
-                `${process.env.NEXT_PUBLIC_API_URL}/users/me`,
-                {
-                    headers: {
-                        Authorization:`Bearer ${token}`
-                    }
-                }
-            );
-            return res.data.user;
-        }
-    });
+  const user = useQuery<User>({
+    queryKey: queryKeys.user,
+    queryFn: async () => {
+      const api = await getApi();
+      return getCurrentUser(api);
+    },
+  });
+
+  const syncUser = useMutation<User>({
+    mutationFn: async () => {
+      const api = await getApi();
+      return getCurrentUser(api);
+    },
+    onSuccess: (data) => {
+      queryClient.setQueryData(queryKeys.user, data);
+    },
+  });
+
+  return { user, syncUser };
 }

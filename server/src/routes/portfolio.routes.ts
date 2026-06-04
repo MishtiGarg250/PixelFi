@@ -8,8 +8,7 @@ import {
   deletePortfolio,
 } from "../controllers/portfolio.controller.js";
 
-// Nested portfolio ↔ holdings router
-import { portfolioHoldingsRouter } from "./holdings.routes.js";
+
 
 const router = express.Router();
 
@@ -20,7 +19,5 @@ router.get("/:portfolioId", protect, getPortfolioById);
 router.patch("/:portfolioId", protect, updatePortfolio);
 router.delete("/:portfolioId", protect, deletePortfolio);
 
-// Nested: manage which UserMarketAssets belong to a portfolio
-router.use("/:portfolioId/holdings", protect, portfolioHoldingsRouter);
 
 export default router;

@@ -16,17 +16,23 @@ import {
   CreditCard,
   CheckCircle2,
   AlertCircle,
+  Search,
+  Banknote,
+  Layers,
+  Database,
 } from "lucide-react";
 import { usePortfolio } from "@/hooks/usePortfolio";
 import { useAccounts } from "@/hooks/useAccount";
-import { useHoldings } from "@/hooks/useHoldings";
+
 import { useTransactions } from "@/hooks/useTransaction";
+import { useCustomAssets, useMarketAssets } from "@/hooks/useAssets";
 import { useRouter, useSearchParams } from "next/navigation";
 import type { AccountType } from "@/services/account.service";
 import type { TransactionType } from "@/services/transaction.service";
+import type { CustomAssetCategory, MarketAsset as AssetMarketAsset } from "@/services/asset.service";
 
 // ─── Tab types ──────────────────────────────────────────────────────────────
-type Tab = "accounts" | "holdings" | "transactions";
+type Tab = "accounts" | "transactions" | "assets";
 
 // ─── Create Account Modal ───────────────────────────────────────────────────
 function CreateAccountModal({
@@ -134,6 +140,602 @@ function CreateAccountModal({
   );
 }
 
+function CreateTransactionModal({
+  open,
+  onClose,
+  onCreate,
+  isPending,
+  accounts,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onCreate: (data: {
+    accountId: string;
+    marketAssetId?: string;
+    type: TransactionType;
+    quantity?: number;
+    price?: number;
+    amount?: number;
+    fees?: number;
+    currency: string;
+    executedAt: string;
+  }) => void;
+  isPending: boolean;
+  accounts: { id: string; name: string; brokerName: string }[];
+}) {
+  const [accountId, setAccountId] = useState(accounts[0]?.id ?? "");
+  const [marketQuery, setMarketQuery] = useState("");
+  const [selectedAsset, setSelectedAsset] = useState<AssetMarketAsset | null>(null);
+  const [type, setType] = useState<TransactionType>("BUY");
+  const [quantity, setQuantity] = useState<string>("");
+  const [price, setPrice] = useState<string>("");
+  const [amount, setAmount] = useState<string>("");
+  const [fees, setFees] = useState<string>("0");
+  const [currency, setCurrency] = useState<string>("USD");
+  const [executedAt, setExecutedAt] = useState<string>(new Date().toISOString().slice(0, 10));
+  const { marketAssets } = useMarketAssets(marketQuery);
+
+  if (!open) return null;
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onCreate({
+      accountId,
+      marketAssetId: selectedAsset?.id,
+      type,
+      quantity: quantity ? Number(quantity) : undefined,
+      price: price ? Number(price) : undefined,
+      amount: amount ? Number(amount) : undefined,
+      fees: fees ? Number(fees) : 0,
+      currency: currency.trim().toUpperCase(),
+      executedAt: executedAt? new Date(executedAt).toISOString(): undefined,
+    });
+  };
+
+  const canSubmit = Boolean(accountId && currency.trim() && executedAt.trim());
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative z-10 w-full max-w-2xl overflow-hidden rounded-3xl border border-white/10 bg-neutral-950 p-6 shadow-2xl shadow-black/60">
+        <div className="flex items-center justify-between mb-5">
+          <div>
+            <h2 className="text-lg font-semibold text-white">New Transaction</h2>
+            <p className="text-sm text-neutral-500 mt-1">Record activity for this portfolio.</p>
+          </div>
+          <button onClick={onClose} className="p-2 rounded-lg hover:bg-white/5 text-neutral-400 transition">
+            <X size={16} />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <label className="block text-xs text-neutral-400">
+              Account
+              <select
+                value={accountId}
+                onChange={(e) => setAccountId(e.target.value)}
+                className="mt-2 w-full rounded-2xl border border-white/10 bg-black/10 px-4 py-3 text-sm text-white outline-none focus:border-[#b5b5f6]"
+                required
+              >
+                <option value="" disabled>
+                  Select an account
+                </option>
+                {accounts.map((acc) => (
+                  <option key={acc.id} value={acc.id}>
+                    {acc.name} — {acc.brokerName}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="block text-xs text-neutral-400">
+              Type
+              <select
+                value={type}
+                onChange={(e) => setType(e.target.value as TransactionType)}
+                className="mt-2 w-full rounded-2xl border border-white/10 bg-black/10 px-4 py-3 text-sm text-white outline-none focus:border-[#b5b5f6]"
+              >
+                <option value="BUY">Buy</option>
+                <option value="SELL">Sell</option>
+                <option value="DIVIDEND">Dividend</option>
+                <option value="DEPOSIT">Deposit</option>
+                <option value="WITHDRAWAL">Withdrawal</option>
+                <option value="INTEREST">Interest</option>
+                <option value="TRANSFER">Transfer</option>
+              </select>
+            </label>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <label className="block text-xs text-neutral-400">
+              Currency
+              <input
+                value={currency}
+                onChange={(e) => setCurrency(e.target.value)}
+                className="mt-2 w-full rounded-2xl border border-white/10 bg-black/10 px-4 py-3 text-sm text-white outline-none focus:border-[#b5b5f6]"
+                required
+              />
+            </label>
+            <label className="block text-xs text-neutral-400">
+              Executed date
+              <input
+                type="date"
+                value={executedAt}
+                onChange={(e) => setExecutedAt(e.target.value)}
+                className="mt-2 w-full rounded-2xl border border-white/10 bg-black/10 px-4 py-3 text-sm text-white outline-none focus:border-[#b5b5f6]"
+                required
+              />
+            </label>
+            <label className="block text-xs text-neutral-400">
+              Fees
+              <input
+                type="number"
+                value={fees}
+                min="0"
+                step="0.01"
+                onChange={(e) => setFees(e.target.value)}
+                className="mt-2 w-full rounded-2xl border border-white/10 bg-black/10 px-4 py-3 text-sm text-white outline-none focus:border-[#b5b5f6]"
+              />
+            </label>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <label className="block text-xs text-neutral-400">
+              Quantity
+              <input
+                type="number"
+                value={quantity}
+                min="0"
+                step="0.0001"
+                onChange={(e) => setQuantity(e.target.value)}
+                className="mt-2 w-full rounded-2xl border border-white/10 bg-black/10 px-4 py-3 text-sm text-white outline-none focus:border-[#b5b5f6]"
+              />
+            </label>
+            <label className="block text-xs text-neutral-400">
+              Price
+              <input
+                type="number"
+                value={price}
+                min="0"
+                step="0.01"
+                onChange={(e) => setPrice(e.target.value)}
+                className="mt-2 w-full rounded-2xl border border-white/10 bg-black/10 px-4 py-3 text-sm text-white outline-none focus:border-[#b5b5f6]"
+              />
+            </label>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <label className="block text-xs text-neutral-400">
+              Amount
+              <input
+                type="number"
+                value={amount}
+                min="0"
+                step="0.01"
+                onChange={(e) => setAmount(e.target.value)}
+                className="mt-2 w-full rounded-2xl border border-white/10 bg-black/10 px-4 py-3 text-sm text-white outline-none focus:border-[#b5b5f6]"
+              />
+            </label>
+            <label className="block text-xs text-neutral-400">
+              Search Market Asset
+              <input
+                type="text"
+                value={marketQuery}
+                onChange={(e) => setMarketQuery(e.target.value)}
+                placeholder="AAPL, BTC, MSFT"
+                className="mt-2 w-full rounded-2xl border border-white/10 bg-black/10 px-4 py-3 text-sm text-white outline-none focus:border-[#b5b5f6]"
+              />
+            </label>
+          </div>
+
+          {marketAssets.data?.length ? (
+            <div className="rounded-3xl border border-white/10 bg-neutral-900/70 p-4">
+              <p className="text-xs uppercase tracking-wider text-neutral-500 mb-3">Search results</p>
+              <div className="space-y-2 max-h-52 overflow-y-auto">
+                {marketAssets.data.map((asset) => (
+                  <button
+                    type="button"
+                    key={asset.id}
+                    onClick={() => {
+                      setSelectedAsset(asset);
+                      setMarketQuery(`${asset.symbol} - ${asset.name}`);
+                    }}
+                    className={`w-full rounded-2xl border px-3 py-2 text-left text-sm transition ${
+                      selectedAsset?.id === asset.id ? "border-[#b5b5f6] bg-white/5" : "border-white/10 hover:border-white/20"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="font-medium text-white">{asset.symbol}</p>
+                        <p className="text-xs text-neutral-500">{asset.name}</p>
+                      </div>
+                      <span className="text-[11px] uppercase tracking-[0.12em] text-neutral-400">{asset.assetType}</span>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : null}
+
+          {selectedAsset ? (
+            <div className="rounded-3xl border border-[#b5b5f6]/20 bg-[#b5b5f6]/5 p-4">
+              <p className="text-xs uppercase tracking-wider text-[#b5b5f6] mb-2">Selected Asset</p>
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="font-medium text-white">{selectedAsset.symbol}</p>
+                  <p className="text-xs text-neutral-400">{selectedAsset.name}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setSelectedAsset(null)}
+                  className="text-xs text-neutral-400 hover:text-white"
+                >
+                  Clear
+                </button>
+              </div>
+            </div>
+          ) : null}
+
+          <div className="flex items-center justify-end gap-3 pt-3">
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-sm text-neutral-300 hover:border-white/20 hover:text-white transition"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={!canSubmit || isPending}
+              className="rounded-2xl bg-linear-to-r from-[#b5b5f6] to-[#f7bff4] px-4 py-2 text-sm font-semibold text-black transition hover:opacity-90 disabled:opacity-50"
+            >
+              {isPending ? <span className="inline-flex items-center gap-2"><Loader2 size={14} className="animate-spin" /> Saving...</span> : "Create Transaction"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function CreateCustomAssetModal({
+  open,
+  onClose,
+  onCreate,
+  isPending,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onCreate: (data: {
+    name: string;
+    description?: string;
+    category: CustomAssetCategory;
+    currentValue: number;
+    purchasePrice?: number;
+    purchaseDate?: string;
+    currency: string;
+    portfolioId?: string;
+  }) => void;
+  isPending: boolean;
+}) {
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+  const [category, setCategory] = useState<CustomAssetCategory>("OTHER");
+  const [currentValue, setCurrentValue] = useState<string>("");
+  const [purchasePrice, setPurchasePrice] = useState<string>("");
+  const [purchaseDate, setPurchaseDate] = useState<string>("");
+  const [currency, setCurrency] = useState<string>("USD");
+
+  if (!open) return null;
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onCreate({
+      name: name.trim(),
+      description: description.trim() || undefined,
+      category,
+      currentValue: Number(currentValue),
+      purchasePrice: purchasePrice ? Number(purchasePrice) : undefined,
+      purchaseDate: purchaseDate
+    ? new Date(purchaseDate).toISOString()
+    : undefined,
+      currency: currency.trim().toUpperCase(),
+      portfolioId: undefined,
+    });
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative z-10 w-full max-w-xl rounded-3xl border border-white/10 bg-neutral-950 p-6 shadow-2xl shadow-black/60">
+        <div className="flex items-center justify-between mb-5">
+          <div>
+            <h2 className="text-lg font-semibold text-white">Add Custom Asset</h2>
+            <p className="text-sm text-neutral-500 mt-1">Track non-market assets in this portfolio.</p>
+          </div>
+          <button onClick={onClose} className="p-2 rounded-lg hover:bg-white/5 text-neutral-400 transition">
+            <X size={16} />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <label className="block text-xs text-neutral-400">
+              Asset name
+              <input
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className="mt-2 w-full rounded-2xl border border-white/10 bg-black/10 px-4 py-3 text-sm text-white outline-none focus:border-[#b5b5f6]"
+                required
+              />
+            </label>
+            <label className="block text-xs text-neutral-400">
+              Category
+              <select
+                value={category}
+                onChange={(e) => setCategory(e.target.value as CustomAssetCategory)}
+                className="mt-2 w-full rounded-2xl border border-white/10 bg-black/10 px-4 py-3 text-sm text-white outline-none focus:border-[#b5b5f6]"
+              >
+                <option value="REAL_ESTATE">Real Estate</option>
+                <option value="VEHICLE">Vehicle</option>
+                <option value="LUXURY_ITEM">Luxury Item</option>
+                <option value="ART">Art</option>
+                <option value="COLLECTIBLE">Collectible</option>
+                <option value="OTHER">Other</option>
+              </select>
+            </label>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <label className="block text-xs text-neutral-400">
+              Current value
+              <input
+                type="number"
+                value={currentValue}
+                min="0"
+                step="0.01"
+                onChange={(e) => setCurrentValue(e.target.value)}
+                className="mt-2 w-full rounded-2xl border border-white/10 bg-black/10 px-4 py-3 text-sm text-white outline-none focus:border-[#b5b5f6]"
+                required
+              />
+            </label>
+            <label className="block text-xs text-neutral-400">
+              Purchase price
+              <input
+                type="number"
+                value={purchasePrice}
+                min="0"
+                step="0.01"
+                onChange={(e) => setPurchasePrice(e.target.value)}
+                className="mt-2 w-full rounded-2xl border border-white/10 bg-black/10 px-4 py-3 text-sm text-white outline-none focus:border-[#b5b5f6]"
+              />
+            </label>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <label className="block text-xs text-neutral-400">
+              Purchase date
+              <input
+                type="date"
+                value={purchaseDate}
+                onChange={(e) => setPurchaseDate(e.target.value)}
+                className="mt-2 w-full rounded-2xl border border-white/10 bg-black/10 px-4 py-3 text-sm text-white outline-none focus:border-[#b5b5f6]"
+              />
+            </label>
+            <label className="block text-xs text-neutral-400 md:col-span-2">
+              Currency
+              <input
+                type="text"
+                value={currency}
+                onChange={(e) => setCurrency(e.target.value)}
+                className="mt-2 w-full rounded-2xl border border-white/10 bg-black/10 px-4 py-3 text-sm text-white outline-none focus:border-[#b5b5f6]"
+                required
+              />
+            </label>
+          </div>
+
+          <label className="block text-xs text-neutral-400">
+            Description
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              rows={3}
+              className="mt-2 w-full rounded-3xl border border-white/10 bg-black/10 px-4 py-3 text-sm text-white outline-none focus:border-[#b5b5f6]"
+            />
+          </label>
+
+          <div className="flex items-center justify-end gap-3 pt-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-sm text-neutral-300 hover:border-white/20 hover:text-white transition"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={isPending || !name.trim() || !currentValue}
+              className="rounded-2xl bg-linear-to-r from-[#b5b5f6] to-[#f7bff4] px-4 py-2 text-sm font-semibold text-black transition hover:opacity-90 disabled:opacity-50"
+            >
+              {isPending ? <span className="inline-flex items-center gap-2"><Loader2 size={14} className="animate-spin" /> Saving...</span> : "Create Asset"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function AssetsTab({ portfolioId }: { portfolioId: string }) {
+  const { customAssets, create, remove } = useCustomAssets(portfolioId);
+  const { marketAssets, create: registerAsset } = useMarketAssets("");
+  const [search, setSearch] = useState("");
+  const [selectedMarketAsset, setSelectedMarketAsset] = useState<AssetMarketAsset | null>(null);
+  const [createOpen, setCreateOpen] = useState(false);
+
+  const handleRegister = () => {
+    if (!selectedMarketAsset) return;
+    registerAsset.mutate(
+      {
+        symbol: selectedMarketAsset.symbol,
+        name: selectedMarketAsset.name,
+        assetType: selectedMarketAsset.assetType as any,
+        currency: selectedMarketAsset.currency,
+      },
+      {
+        onSuccess: () => {
+          setSelectedMarketAsset(null);
+          setSearch("");
+        },
+      }
+    );
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h3 className="text-sm font-semibold text-white">Assets</h3>
+          <p className="text-xs text-neutral-500">Search market assets or add custom holdings to this portfolio.</p>
+        </div>
+        <button
+          onClick={() => setCreateOpen(true)}
+          className="inline-flex items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-xs text-neutral-300 hover:text-white hover:border-white/20 transition"
+        >
+          <Plus size={14} /> Add Custom Asset
+        </button>
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
+        <div className="rounded-3xl border border-white/10 bg-neutral-950/50 p-5">
+          <label className="block text-xs text-neutral-400 mb-2">
+            Search market assets
+          </label>
+          <div className="relative">
+            <Search className="absolute left-4 top-4 text-neutral-500" size={16} />
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Type a ticker or company name"
+              className="w-full rounded-3xl border border-white/10 bg-black/10 px-12 py-3 text-sm text-white outline-none focus:border-[#b5b5f6]"
+            />
+          </div>
+
+          {search.length > 0 && (
+            <div className="mt-4 space-y-2 max-h-64 overflow-y-auto">
+              {marketAssets.isLoading ? (
+                <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-neutral-500">Searching...</div>
+              ) : marketAssets.data?.length ? (
+                marketAssets.data.map((asset) => (
+                  <button
+                    type="button"
+                    key={asset.id}
+                    onClick={() => setSelectedMarketAsset(asset)}
+                    className={`w-full rounded-2xl border px-4 py-3 text-left transition ${
+                      selectedMarketAsset?.id === asset.id ? "border-[#b5b5f6] bg-white/5" : "border-white/10 bg-transparent hover:border-white/20"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="font-medium text-white">{asset.symbol}</p>
+                        <p className="text-xs text-neutral-500">{asset.name}</p>
+                      </div>
+                      <span className="text-[11px] uppercase tracking-[0.12em] text-neutral-400">{asset.assetType}</span>
+                    </div>
+                  </button>
+                ))
+              ) : (
+                <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-neutral-500">No assets found for {search}.</div>
+              )}
+            </div>
+          )}
+
+          {selectedMarketAsset && (
+            <div className="mt-4 rounded-3xl border border-[#b5b5f6]/20 bg-[#b5b5f6]/5 p-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="font-medium text-white">{selectedMarketAsset.symbol}</p>
+                  <p className="text-xs text-neutral-300">{selectedMarketAsset.name}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setSelectedMarketAsset(null)}
+                  className="text-xs text-neutral-400 hover:text-white"
+                >
+                  Clear
+                </button>
+              </div>
+              <button
+                type="button"
+                onClick={handleRegister}
+                disabled={registerAsset.isPending}
+                className="mt-4 inline-flex items-center gap-2 rounded-2xl bg-linear-to-r from-[#b5b5f6] to-[#f7bff4] px-4 py-2 text-sm font-semibold text-black transition hover:opacity-90 disabled:opacity-50"
+              >
+                {registerAsset.isPending ? <Loader2 size={14} className="animate-spin" /> : "Register Market Asset"}
+              </button>
+            </div>
+          )}
+        </div>
+
+        <div className="rounded-3xl border border-white/10 bg-neutral-950/50 p-5">
+          <div className="flex items-center justify-between gap-3 mb-4">
+            <div>
+              <p className="text-xs uppercase tracking-wider text-neutral-500">Custom assets</p>
+              <p className="text-sm text-neutral-400">Manage portfolio-only assets.</p>
+            </div>
+            <span className="rounded-full bg-white/5 px-3 py-1 text-xs text-neutral-300">{customAssets.data?.length ?? 0}</span>
+          </div>
+
+          {customAssets.isLoading ? (
+            <div className="space-y-3">
+              {[1, 2].map((index) => (
+                <div key={index} className="h-18 rounded-2xl border border-white/10 bg-white/5 p-4 animate-pulse" />
+              ))}
+            </div>
+          ) : customAssets.data?.length ? (
+            <div className="space-y-3">
+              {customAssets.data.map((asset) => (
+                <div key={asset.id} className="rounded-3xl border border-white/10 bg-black/10 p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="font-medium text-white">{asset.name}</p>
+                      <p className="text-xs text-neutral-400">{asset.category}</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => remove.mutate(asset.id)}
+                      className="text-neutral-500 hover:text-red-400"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                  <div className="mt-3 flex items-center justify-between gap-3 text-xs text-neutral-400">
+                    <span>{asset.currency} {asset.currentValue.toLocaleString()}</span>
+                    <span>{asset.purchaseDate ? new Date(asset.purchaseDate).toLocaleDateString() : "No purchase date"}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="rounded-3xl border border-dashed border-white/10 bg-white/5 p-6 text-center text-sm text-neutral-500">
+              No custom assets yet.
+            </div>
+          )}
+        </div>
+      </div>
+
+      <CreateCustomAssetModal
+        open={createOpen}
+        onClose={() => setCreateOpen(false)}
+        onCreate={(data) => create.mutate({ ...data, portfolioId }, { onSuccess: () => setCreateOpen(false) })}
+        isPending={create.isPending}
+      />
+    </div>
+  );
+}
+
 // ─── Accounts Tab ───────────────────────────────────────────────────────────
 function AccountsTab({ portfolioId }: { portfolioId: string }) {
   const { accounts, create, remove } = useAccounts(portfolioId);
@@ -219,88 +821,47 @@ function AccountsTab({ portfolioId }: { portfolioId: string }) {
   );
 }
 
-// ─── Holdings Tab ───────────────────────────────────────────────────────────
-function HoldingsTab({ portfolioId }: { portfolioId: string }) {
-  const { holdings } = useHoldings(portfolioId);
-
-  const totalValue = holdings.data?.reduce((sum, h) => sum + h.quantity * h.averageCost, 0) ?? 0;
-
-  return (
-    <div className="space-y-5">
-      {holdings.isLoading && (
-        <div className="space-y-3">
-          {[1, 2, 3].map((i) => <div key={i} className="h-16 rounded-2xl border border-white/5 bg-white/2 animate-pulse" />)}
-        </div>
-      )}
-
-      {!holdings.isLoading && holdings.data?.length === 0 && (
-        <div className="flex flex-col items-center justify-center py-16 rounded-2xl border border-dashed border-white/8 text-center">
-          <BarChart2 size={24} className="text-neutral-600 mb-3" />
-          <p className="text-sm text-neutral-500">No holdings yet. Add transactions to see holdings.</p>
-        </div>
-      )}
-
-      {holdings.data && holdings.data.length > 0 && (
-        <>
-          {/* Allocation bar */}
-          <div className="h-2 w-full rounded-full overflow-hidden flex gap-0.5">
-            {holdings.data.map((h, i) => {
-              const weight = totalValue > 0 ? ((h.quantity * h.averageCost) / totalValue) * 100 : 0;
-              const colors = ["bg-[#b5b5f6]", "bg-[#f7bff4]", "bg-[#d8c4ff]", "bg-neutral-500", "bg-emerald-400", "bg-amber-400"];
-              return <div key={h.marketAssetId} style={{ width: `${weight}%` }} className={`h-full rounded-full ${colors[i % colors.length]}`} />;
-            })}
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {holdings.data.map((holding, i) => {
-              const value = holding.quantity * holding.averageCost;
-              const weight = totalValue > 0 ? ((value / totalValue) * 100).toFixed(1) : "0.0";
-              const dotColors = ["bg-[#b5b5f6]", "bg-[#f7bff4]", "bg-[#d8c4ff]", "bg-neutral-500", "bg-emerald-400", "bg-amber-400"];
-
-              return (
-                <div key={holding.marketAssetId} className="rounded-2xl border border-white/5 bg-neutral-950/40 p-5 flex items-center justify-between hover:border-white/10 hover:bg-neutral-900/30 transition">
-                  <div className="flex items-center gap-3">
-                    <div className={`h-2.5 w-2.5 rounded-full ${dotColors[i % dotColors.length]}`} />
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-semibold text-white text-sm">{holding.symbol}</span>
-                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/4 border border-white/5 text-neutral-400">
-                          {holding.quantity.toFixed(4)} units
-                        </span>
-                      </div>
-                      <p className="text-xs text-neutral-500 mt-0.5">{holding.assetName}</p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <span className="text-sm font-medium text-white block">
-                      ${value.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </span>
-                    <span className="text-xs text-[#f7bff4] font-medium">{weight}% weight</span>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </>
-      )}
-    </div>
-  );
-}
 
 // ─── Transactions Tab ───────────────────────────────────────────────────────
 function TransactionsTab({ portfolioId }: { portfolioId: string }) {
-  const { transactions } = useTransactions(portfolioId);
+  const { transactions, create } = useTransactions();
+  const { accounts } = useAccounts(portfolioId);
+  const [createOpen, setCreateOpen] = useState(false);
 
   const typeConfig: Record<TransactionType, { label: string; color: string; icon: React.ReactNode }> = {
-    BUY: { label: "Buy", color: "text-[#b5b5f6]", icon: <TrendingUp size={12} /> },
+    BUY: { label: "Buy", color: "text-[#b5bff6]", icon: <TrendingUp size={12} /> },
     SELL: { label: "Sell", color: "text-[#f7bff4]", icon: <TrendingDown size={12} /> },
     DIVIDEND: { label: "Dividend", color: "text-emerald-400", icon: <CheckCircle2 size={12} /> },
     DEPOSIT: { label: "Deposit", color: "text-sky-400", icon: <Plus size={12} /> },
     WITHDRAWAL: { label: "Withdrawal", color: "text-amber-400", icon: <AlertCircle size={12} /> },
+    INTEREST: { label: "Interest", color: "text-sky-400", icon: <CheckCircle2 size={12} /> },
+    TRANSFER: { label: "Transfer", color: "text-neutral-400", icon: <ArrowLeftRight size={12} /> },
   };
 
   return (
     <div className="space-y-5">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h3 className="text-sm font-semibold text-white">Transactions</h3>
+          <p className="text-xs text-neutral-500">Record and review activity across this portfolio.</p>
+        </div>
+        <button
+          type="button"
+          onClick={() => setCreateOpen(true)}
+          className="inline-flex items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-xs text-neutral-300 hover:text-white hover:border-white/20 transition"
+        >
+          <Plus size={14} /> Add Transaction
+        </button>
+      </div>
+
+      <CreateTransactionModal
+        open={createOpen}
+        onClose={() => setCreateOpen(false)}
+        isPending={create.isPending}
+        accounts={accounts.data ?? []}
+        onCreate={(data) => create.mutate(data, { onSuccess: () => setCreateOpen(false) })}
+      />
+
       {transactions.isLoading && (
         <div className="space-y-3">
           {[1, 2, 3, 4].map((i) => <div key={i} className="h-14 rounded-xl border border-white/5 bg-white/2 animate-pulse" />)}
@@ -331,14 +892,14 @@ function TransactionsTab({ portfolioId }: { portfolioId: string }) {
             <tbody className="divide-y divide-white/5">
               {transactions.data.map((tx) => {
                 const cfg = typeConfig[tx.type];
-                const total = Number(tx.quantity) * Number(tx.price);
+                const total = Number(tx.quantity ?? 0) * Number(tx.price ?? 0);
                 const isOutflow = tx.type === "BUY" || tx.type === "WITHDRAWAL";
 
                 return (
                   <tr key={tx.id} className="hover:bg-white/1 transition-colors">
                     <td className="p-4">
-                      <span className="font-semibold text-white">{tx.marketAsset.symbol}</span>
-                      <span className="block text-xs text-neutral-500 mt-0.5">{tx.marketAsset.name}</span>
+                      <span className="font-semibold text-white">{tx.marketAsset?.symbol ?? "N/A"}</span>
+                      <span className="block text-xs text-neutral-500 mt-0.5">{tx.marketAsset?.name ?? "Unknown asset"}</span>
                     </td>
                     <td className="p-4">
                       <span className={`flex items-center gap-1 text-xs font-medium ${cfg.color}`}>
@@ -346,9 +907,9 @@ function TransactionsTab({ portfolioId }: { portfolioId: string }) {
                       </span>
                     </td>
                     <td className="p-4 text-xs text-neutral-400">{tx.account.name}</td>
-                    <td className="p-4 font-mono text-xs text-neutral-300">{Number(tx.quantity).toFixed(4)}</td>
+                    <td className="p-4 font-mono text-xs text-neutral-300">{Number(tx.quantity ?? 0).toFixed(4)}</td>
                     <td className="p-4 font-mono text-xs text-neutral-300">
-                      ${Number(tx.price).toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                      ${Number(tx.price ?? 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}
                     </td>
                     <td className="p-4 text-xs text-neutral-500">
                       {new Date(tx.executedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
@@ -382,8 +943,9 @@ export default function PortfolioDetailPage({
 
   const tabs: { id: Tab; label: string; icon: React.ReactNode }[] = [
     { id: "accounts", label: "Accounts", icon: <Wallet size={14} /> },
-    { id: "holdings", label: "Holdings", icon: <BarChart2 size={14} /> },
+ 
     { id: "transactions", label: "Transactions", icon: <ArrowLeftRight size={14} /> },
+    { id: "assets", label: "Assets", icon: <Layers size={14} /> },
   ];
 
   if (portfolio.isLoading) {
@@ -430,7 +992,7 @@ export default function PortfolioDetailPage({
         </button>
 
         <div className="flex items-start gap-4">
-          <div className="h-12 w-12 shrink-0 rounded-xl bg-gradient-to-br from-[#b5b5f6]/20 to-[#f7bff4]/10 border border-white/8 flex items-center justify-center text-[#b5b5f6]">
+          <div className="h-12 w-12 shrink-0 rounded-xl bg-linear-to-br from-[#b5b5f6]/20 to-[#f7bff4]/10 border border-white/8 flex items-center justify-center text-[#b5b5f6]">
             <FolderKanban size={20} />
           </div>
           <div>
@@ -444,7 +1006,6 @@ export default function PortfolioDetailPage({
       <div className="grid grid-cols-3 gap-4">
         {[
           { label: "Accounts", value: p._count?.accounts ?? 0, color: "text-[#b5b5f6]" },
-          { label: "Holdings", value: p._count?.holdings ?? 0, color: "text-[#f7bff4]" },
           { label: "Created", value: new Date(p.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "2-digit" }), color: "text-white" },
         ].map((s) => (
           <div key={s.label} className="rounded-xl border border-white/5 bg-neutral-950/40 p-4">
@@ -477,8 +1038,8 @@ export default function PortfolioDetailPage({
       {/* Tab Content */}
       <div>
         {activeTab === "accounts" && <AccountsTab portfolioId={portfolioId} />}
-        {activeTab === "holdings" && <HoldingsTab portfolioId={portfolioId} />}
         {activeTab === "transactions" && <TransactionsTab portfolioId={portfolioId} />}
+        {activeTab === "assets" && <AssetsTab portfolioId={portfolioId} />}
       </div>
     </div>
   );

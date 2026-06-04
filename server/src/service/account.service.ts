@@ -2,7 +2,7 @@ import prisma from "../lib/prisma.js";
 
 interface CreateAccountInput {
   name: string;
-  brokerName?: string;
+  brokerName?: string | undefined;
   accountType: "BROKERAGE" | "BANK" | "CRYPTO";
   currency: string;
 }

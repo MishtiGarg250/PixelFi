@@ -2,11 +2,11 @@ import prisma from "../lib/prisma.js";
 
 interface CreateTransactionInput {
   accountId: string;
-  marketAssetId?: string;
+  marketAssetId?: string |  undefined;
   type: "BUY" | "SELL" | "DEPOSIT" | "WITHDRAWAL" | "DIVIDEND" | "INTEREST" | "TRANSFER";
-  quantity?: number;
-  price?: number;
-  amount?: number;
+  quantity?: number | undefined;
+  price?: number | undefined;
+  amount?: number | undefined;
   fees?: number | undefined;
   currency: string;
   executedAt: string;

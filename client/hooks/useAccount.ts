@@ -3,23 +3,24 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useApi } from "./useApi";
 import {
-  getPortfolioAccounts,
+  getAccounts,
   createAccount,
   deleteAccount,
   type AccountType,
 } from "@/services/account.service";
+import { queryKeys } from "@/lib/queryKeys";
 
-export function useAccounts(portfolioId: string) {
+export function useAccounts(portfolioId?: string) {
   const { getApi } = useApi();
   const queryClient = useQueryClient();
 
   const accounts = useQuery({
-    queryKey: ["accounts", portfolioId],
+    queryKey: queryKeys.accounts,
     queryFn: async () => {
       const api = await getApi();
-      return getPortfolioAccounts(api, portfolioId);
+      return getAccounts(api);
     },
-    enabled: !!portfolioId,
+    enabled: true,
   });
 
   const create = useMutation({
@@ -30,20 +31,20 @@ export function useAccounts(portfolioId: string) {
       currency: string;
     }) => {
       const api = await getApi();
-      return createAccount(api, portfolioId, data);
+      return createAccount(api, data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["accounts", portfolioId] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.accounts });
     },
   });
 
   const remove = useMutation({
     mutationFn: async (accountId: string) => {
       const api = await getApi();
-      return deleteAccount(api, portfolioId, accountId);
+      return deleteAccount(api, accountId);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["accounts", portfolioId] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.accounts });
     },
   });
 

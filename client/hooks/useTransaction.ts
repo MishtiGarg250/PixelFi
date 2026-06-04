@@ -3,41 +3,45 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useApi } from "./useApi";
 import {
-  getPortfolioTransactions,
+  getTransactions,
+  getAccountTransactions,
   createTransaction,
   type TransactionType,
 } from "@/services/transaction.service";
+import { queryKeys } from "@/lib/queryKeys";
 
-export function useTransactions(portfolioId: string) {
+export function useTransactions(accountId?: string) {
   const { getApi } = useApi();
   const queryClient = useQueryClient();
 
   const transactions = useQuery({
-    queryKey: ["transactions", portfolioId],
+    queryKey: accountId ? queryKeys.accountTransactions(accountId) : queryKeys.transactions,
     queryFn: async () => {
       const api = await getApi();
-      return getPortfolioTransactions(api, portfolioId);
+      return accountId ? getAccountTransactions(api, accountId) : getTransactions(api);
     },
-    enabled: !!portfolioId,
+    enabled: true,
   });
 
   const create = useMutation({
     mutationFn: async (data: {
       accountId: string;
-      marketAssetId: string;
+      marketAssetId?: string;
       type: TransactionType;
-      quantity: number;
-      price: number;
+      quantity?: number;
+      price?: number;
+      amount?: number;
       fees?: number;
       currency: string;
       executedAt: string;
     }) => {
       const api = await getApi();
-      return createTransaction(api, portfolioId, data);
+      return createTransaction(api, data);
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["transactions", portfolioId] });
-      queryClient.invalidateQueries({ queryKey: ["holdings", portfolioId] });
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.transactions });
+      queryClient.invalidateQueries({ queryKey: queryKeys.holdingsList });
+      queryClient.invalidateQueries({ queryKey: queryKeys.accountTransactions(variables.accountId) });
     },
   });
 

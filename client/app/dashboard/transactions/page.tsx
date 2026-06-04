@@ -47,7 +47,7 @@ export default function TransactionsPage() {
               className="group text-left rounded-2xl border border-white/5 bg-neutral-950/40 p-5 flex items-center justify-between hover:border-white/10 hover:bg-neutral-900/30 transition-all"
             >
               <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-[#b5b5f6]/15 to-[#f7bff4]/10 border border-white/8 flex items-center justify-center text-[#b5b5f6]">
+                <div className="h-10 w-10 rounded-xl bg-linear-to-br from-[#b5b5f6]/15 to-[#f7bff4]/10 border border-white/8 flex items-center justify-center text-[#b5b5f6]">
                   <FolderKanban size={15} />
                 </div>
                 <div>

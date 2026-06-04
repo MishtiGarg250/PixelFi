@@ -9,13 +9,14 @@ import {
   updatePortfolio,
   deletePortfolio,
 } from "@/services/portfolio.service";
+import { queryKeys } from "@/lib/queryKeys";
 
 export function usePortfolios() {
   const { getApi } = useApi();
   const queryClient = useQueryClient();
 
   const portfolios = useQuery({
-    queryKey: ["portfolios"],
+    queryKey: queryKeys.portfolios,
     queryFn: async () => {
       const api = await getApi();
       return getPortfolios(api);
@@ -28,7 +29,7 @@ export function usePortfolios() {
       return createPortfolio(api, data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["portfolios"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.portfolios });
     },
   });
 
@@ -44,8 +45,8 @@ export function usePortfolios() {
       return updatePortfolio(api, portfolioId, data);
     },
     onSuccess: (_, vars) => {
-      queryClient.invalidateQueries({ queryKey: ["portfolios"] });
-      queryClient.invalidateQueries({ queryKey: ["portfolio", vars.portfolioId] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.portfolios });
+      queryClient.invalidateQueries({ queryKey: queryKeys.portfolio(vars.portfolioId) });
     },
   });
 
@@ -55,7 +56,7 @@ export function usePortfolios() {
       return deletePortfolio(api, portfolioId);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["portfolios"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.portfolios });
     },
   });
 
@@ -66,7 +67,7 @@ export function usePortfolio(portfolioId: string) {
   const { getApi } = useApi();
 
   return useQuery({
-    queryKey: ["portfolio", portfolioId],
+    queryKey: queryKeys.portfolio(portfolioId),
     queryFn: async () => {
       const api = await getApi();
       return getPortfolioById(api, portfolioId);
