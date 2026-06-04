@@ -21,6 +21,7 @@ export const protect = async (
 
     next();
   } catch (error) {
+    
     next(error);
   }
 };
