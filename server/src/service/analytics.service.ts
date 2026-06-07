@@ -51,8 +51,7 @@ export const getNetWorthService = async (
   const holdings = marketAssets.map((asset) => {
     const quantity = Number(asset.quantity);
 
-    const averageCost =
-      Number(asset.averageCost);
+    const averageCost = Number(asset.averageCost);
 
     const symbol =
       asset.marketAsset.symbol;

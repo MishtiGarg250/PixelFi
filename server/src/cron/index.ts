@@ -1,4 +1,4 @@
-import { startDailySnapshotCron } from "./dailySnapShot.cron..js";
+import { startDailySnapshotCron } from "./dailySnapshot.cron.js";
 import { startMonthlySnapshotCron } from "./monthlySnapshot.cron.js";
 import { startInsightCron } from "./insight.cron.js";
 

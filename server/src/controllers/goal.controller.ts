@@ -8,7 +8,7 @@ import {
     deleteGoalService
 } from "../service/goal.service.js"
 
-export const creatGoal = async (
+export const createGoal = async (
     req: Request,
     res: Response
 ) => {
@@ -48,36 +48,44 @@ export const getUserGoals = async (
             })
         }
 
-        const goals = getUserGoalService(userId);
+        const goals = await getUserGoalService(userId);
         return res.status(200).json({
             success: true,
             data: goals,
         })
-    }catch(error){
+    } catch (error) {
         console.error(error);
         return res.status(500).json({
             success: false,
-            message:"Failed to fetch goals",
+            message: "Failed to fetch goals",
         })
     }
-    
+
 }
 
 export const updateGoal = async (
     req: Request,
     res: Response
 ) => {
-    try{
-        const {userId} = getAuth(req);
-        if(!userId){
+    try {
+        const { userId } = getAuth(req);
+        if (!userId) {
             return res.status(401).json({
-                message:"Unauthorised",
+                message: "Unauthorised",
             })
         };
 
+        const id = req.params.id as string;
+
+        if (!id) {
+            return res.status(400).json({
+                success: false,
+                message: "Goal id is required",
+            });
+        }
         const goal = await updateGoalService(
             userId,
-            req.params.id,
+            id,
             req.body
         );
 
@@ -86,11 +94,11 @@ export const updateGoal = async (
             data: goal,
         });
 
-    }catch(error){
+    } catch (error) {
         console.error(error);
         return res.status(500).json({
-            success:false,
-            message:"Failed to update goal",
+            success: false,
+            message: "Failed to update goal",
         })
     }
 }
@@ -106,8 +114,16 @@ export const deleteGoal = async (
                 message: "Unauthorized",
             })
         };
+        const id = req.params.id as string;
+
+        if (!id) {
+            return res.status(400).json({
+                success: false,
+                message: "Goal id is required",
+            });
+        }
         await deleteGoalService(
-            userId, req.params.id
+            userId, id
         );
 
         return res.status(200).json({

@@ -41,7 +41,8 @@ export const updateExpense = async(req: Request, res: Response) => {
         if(!userId){
             return res.status(401).json({ message: "Unauthorized" });
         }
-        const expense = await updateExpenseService(userId, req.params.id, req.body);
+        const id = req.params.id as string;
+        const expense = await updateExpenseService(userId, id, req.body);
         return res.status(200).json({
             success: true,
             data: expense,
@@ -59,7 +60,8 @@ export const deleteExpense = async(req: Request, res: Response) => {
         if(!userId){
             return res.status(401).json({ message: "Unauthorized" });
         }
-        const expense = await deleteExpenseService(userId, req.params.id);
+        const id = req.params.id as string;
+        const expense = await deleteExpenseService(userId, id);
         return res.status(200).json({
             success: true,
             data: expense,

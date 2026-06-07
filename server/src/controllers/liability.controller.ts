@@ -44,7 +44,7 @@ export const updateLiability = async (req: Request, res: Response) => {
     if (!userId) return res.status(401).json({ message: "Unauthorized" });
 
     const liabilityId = req.params.liabilityId as string;
-    const validatedData = updateLiabilitySchema.parse(req.body);
+    const validatedData = req.body;
     const liability = await updateLiabilityService(userId, liabilityId, validatedData);
     return res.status(200).json({ success: true, liability });
   } catch (error) {

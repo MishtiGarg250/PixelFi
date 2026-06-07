@@ -10,22 +10,23 @@ interface CreateLiabilityInput {
     | "OTHER";
   originalAmount: number;
   outstanding: number;
-  interestRate?: number;
+  interestRate?: number | undefined;
   currency: string;
 }
 
 interface UpdateLiabilityInput {
-  name?: string;
+  name?: string | undefined;
   type?:
     | "MORTGAGE"
     | "CAR_LOAN"
     | "PERSONAL_LOAN"
     | "CREDIT_CARD"
-    | "OTHER";
-  originalAmount?: number;
-  outstanding?: number;
-  interestRate?: number | null;
-  currency?: string;
+    | "OTHER"
+    | undefined;
+  originalAmount?: number | undefined;
+  outstanding?: number | undefined;
+  interestRate?: number | undefined;
+  currency?: string | undefined;
 }
 
 async function resolveUser(clerkUserId: string) {
@@ -86,7 +87,7 @@ export const createLiabilityService = async (
 
   if (
     data.interestRate !== undefined &&
-    data.interestRate < 0
+    data.interestRate! < 0
   ) {
     throw new Error(
       "Interest rate cannot be negative"
