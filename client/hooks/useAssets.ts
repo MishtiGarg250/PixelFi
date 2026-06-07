@@ -9,9 +9,14 @@ import {
   createCustomAsset,
   updateCustomAsset,
   deleteCustomAsset,
+  getUserMarketAssets,
+  addUserMarketAsset,
+  deleteUserMarketAsset,
   type CreateMarketAssetInput,
   type CreateCustomAssetInput,
   type UpdateCustomAssetInput,
+  type UserMarketAsset,
+  type AddUserMarketAssetInput,
 } from "@/services/asset.service";
 import { queryKeys } from "@/lib/queryKeys";
 
@@ -85,4 +90,49 @@ export function useCustomAssets(portfolioId?: string) {
   });
 
   return { customAssets, create, update, remove };
+}
+
+export function useUserMarketAssets() {
+  const { getApi } = useApi();
+  const queryClient = useQueryClient();
+
+  const userMarketAssets = useQuery({
+    queryKey: queryKeys.userMarketAssets,
+    queryFn: async () => {
+      const api = await getApi();
+      return getUserMarketAssets(api);
+    },
+  });
+
+  const addAsset = useMutation({
+    mutationFn: async (data: AddUserMarketAssetInput) => {
+      const api = await getApi();
+      return addUserMarketAsset(api, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.userMarketAssets });
+      queryClient.invalidateQueries({ queryKey: ["marketAssets"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.portfolios });
+      queryClient.invalidateQueries({ queryKey: ["portfolio"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.analytics.netWorth });
+      queryClient.invalidateQueries({ queryKey: queryKeys.analytics.allocation });
+      queryClient.invalidateQueries({ queryKey: queryKeys.analytics.performance });
+    },
+  });
+
+  const removeAsset = useMutation({
+    mutationFn: async (id: string) => {
+      const api = await getApi();
+      return deleteUserMarketAsset(api, id);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.userMarketAssets });
+      queryClient.invalidateQueries({ queryKey: ["marketAssets"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.analytics.netWorth });
+      queryClient.invalidateQueries({ queryKey: queryKeys.analytics.allocation });
+      queryClient.invalidateQueries({ queryKey: queryKeys.analytics.performance });
+    },
+  });
+
+  return { userMarketAssets, addAsset, removeAsset };
 }

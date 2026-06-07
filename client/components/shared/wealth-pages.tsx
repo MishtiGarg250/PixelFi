@@ -44,7 +44,7 @@ import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { useAccounts } from "@/hooks/useAccount";
 import { useAllocation, useNetWorth, usePerformance } from "@/hooks/useAnalytics";
-import { useCustomAssets, useMarketAssets } from "@/hooks/useAssets";
+import { useCustomAssets, useMarketAssets, useUserMarketAssets } from "@/hooks/useAssets";
 import { useLiabilities } from "@/hooks/useLiabilities";
 import { usePortfolio, usePortfolios } from "@/hooks/usePortfolio";
 import { useTransactions } from "@/hooks/useTransaction";
@@ -55,10 +55,12 @@ import type {
   CustomAsset,
   MarketAsset,
   UpdateCustomAssetInput,
+  UserMarketAsset,
 } from "@/services/asset.service";
 import type { Liability } from "@/services/liability.service";
 import type { Portfolio } from "@/services/portfolio.service";
 import type { Transaction, TransactionType } from "@/services/transaction.service";
+import SearchCommand from "./SearchCommand";
 
 const accent = ["#b5b5f6", "#f7bff4", "#d8c4ff", "#a7f3d0", "#93c5fd", "#fcd34d"];
 const transactionTypes = ["BUY", "SELL", "DIVIDEND", "DEPOSIT", "WITHDRAWAL", "INTEREST", "TRANSFER"] as const;
@@ -112,18 +114,20 @@ function PrimaryButton({
   onClick,
   type = "button",
   disabled,
+  className,
 }: {
   children: React.ReactNode;
   onClick?: () => void;
   type?: "button" | "submit";
   disabled?: boolean;
+  className?: string;
 }) {
   return (
     <button
       type={type}
       onClick={onClick}
       disabled={disabled}
-      className="inline-flex items-center justify-center gap-2 rounded-full bg-linear-to-r from-[#b5b5f6] to-[#f7bff4] px-4 py-2 text-xs font-semibold text-black shadow-[0_0_20px_rgba(181,181,246,0.14)] transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+      className={cn("inline-flex items-center justify-center gap-2 rounded-full bg-linear-to-r from-[#b5b5f6] to-[#f7bff4] px-4 py-2 text-xs font-semibold text-black shadow-[0_0_20px_rgba(181,181,246,0.14)] transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50", className)}
     >
       {children}
     </button>
@@ -136,12 +140,14 @@ function GhostButton({
   type = "button",
   disabled,
   tone = "default",
+  className,
 }: {
   children: React.ReactNode;
   onClick?: () => void;
   type?: "button" | "submit";
   disabled?: boolean;
   tone?: "default" | "danger";
+  className?: string;
 }) {
   return (
     <button
@@ -152,7 +158,8 @@ function GhostButton({
         "inline-flex items-center justify-center gap-2 rounded-xl border px-3 py-2 text-xs transition disabled:cursor-not-allowed disabled:opacity-50",
         tone === "danger"
           ? "border-red-500/20 bg-red-500/10 text-red-300 hover:bg-red-500/15"
-          : "border-white/8 bg-white/3 text-neutral-300 hover:border-white/15 hover:text-white"
+          : "border-white/8 bg-white/3 text-neutral-300 hover:border-white/15 hover:text-white",
+        className
       )}
     >
       {children}
@@ -421,6 +428,70 @@ function MarketAssetForm({ onSubmit, pending }: { onSubmit: (data: z.infer<typeo
       </div>
       <PrimaryButton type="submit" disabled={pending}>
         {pending ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />} Save Asset
+      </PrimaryButton>
+    </form>
+  );
+}
+
+const trackAssetSchema = z.object({
+  symbol: z.string().min(1),
+  name: z.string().min(1),
+  quantity: z.coerce.number().nonnegative(),
+  averageCost: z.coerce.number().nonnegative(),
+  portfolioId: z.string().optional(),
+});
+
+function TrackAssetForm({
+  symbol,
+  name,
+  initialValues,
+  portfolios,
+  onSubmit,
+  pending,
+}: {
+  symbol: string;
+  name: string;
+  initialValues?: { quantity: number; averageCost: number; portfolioId?: string };
+  portfolios: Portfolio[];
+  onSubmit: (data: z.infer<typeof trackAssetSchema>) => void;
+  pending: boolean;
+}) {
+  const form = useForm<z.infer<typeof trackAssetSchema>>({
+    resolver: zodResolver(trackAssetSchema) as any,
+    defaultValues: {
+      symbol,
+      name,
+      quantity: initialValues?.quantity ?? 0,
+      averageCost: initialValues?.averageCost ?? 0,
+      portfolioId: initialValues?.portfolioId ?? "",
+    },
+  });
+
+  return (
+    <form onSubmit={form.handleSubmit(onSubmit as any)} className="space-y-4">
+      <div className="rounded-xl border border-white/5 bg-white/2 p-3 text-sm">
+        <p className="font-semibold text-white">{symbol}</p>
+        <p className="text-xs text-neutral-400">{name}</p>
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Field label="Quantity Owned" error={form.formState.errors.quantity?.message}>
+          <input className={inputClass} type="number" step="0.0001" {...form.register("quantity")} />
+        </Field>
+        <Field label="Average Buy Price" error={form.formState.errors.averageCost?.message}>
+          <input className={inputClass} type="number" step="0.01" {...form.register("averageCost")} />
+        </Field>
+      </div>
+
+      <Field label="Portfolio (Optional)" error={form.formState.errors.portfolioId?.message}>
+        <select className={selectClass} {...form.register("portfolioId")}>
+          <option value="">Unassigned</option>
+          {portfolios.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+        </select>
+      </Field>
+
+      <PrimaryButton type="submit" disabled={pending}>
+        {pending ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />} Track Stock Holding
       </PrimaryButton>
     </form>
   );
@@ -804,22 +875,259 @@ export function TransactionsPage() {
 export function MarketAssetsPage() {
   const [query, setQuery] = useState("A");
   const [open, setOpen] = useState(false);
+  const [trackTarget, setTrackTarget] = useState<{ symbol: string; name: string } | null>(null);
+  const [editHolding, setEditHolding] = useState<UserMarketAsset | null>(null);
+
   const { marketAssets, create } = useMarketAssets(query);
+  const { userMarketAssets, addAsset, removeAsset } = useUserMarketAssets();
+  const { portfolios } = usePortfolios();
+
   return (
     <div className="space-y-8">
-      <PageHeader title="Market Assets" description="Search listed securities and register assets used by transactions." action={<PrimaryButton onClick={() => setOpen(true)}><Plus size={14} /> Create Market Asset</PrimaryButton>} />
-      <Panel><div className="relative"><Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-600" /><input className={cn(inputClass, "pl-9")} value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search by symbol or name" /></div></Panel>
-      {marketAssets.isLoading ? <SkeletonGrid /> : marketAssets.data?.length ? (
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-          {marketAssets.data.map((asset) => (
-            <Panel key={asset.id}>
-              <div className="flex items-start justify-between"><div><h2 className="text-lg font-semibold text-white">{asset.symbol}</h2><p className="text-xs text-neutral-500">{asset.name}</p></div><span className="rounded-full border border-white/8 bg-white/3 px-2 py-1 text-[11px]">{title(asset.assetType)}</span></div>
-              <div className="mt-5 space-y-2 text-xs text-neutral-500"><p>Exchange <span className="float-right text-neutral-300">{asset.exchange ?? "N/A"}</span></p><p>Sector <span className="float-right text-neutral-300">{asset.sector ?? "N/A"}</span></p><p>Currency <span className="float-right font-mono text-neutral-300">{asset.currency}</span></p></div>
-            </Panel>
-          ))}
+      <PageHeader
+        title="Market Assets"
+        description="Search listed securities and track holdings in your wealth portfolio."
+        action={
+          <PrimaryButton onClick={() => setOpen(true)}>
+            <Plus size={14} /> Create Market Asset
+          </PrimaryButton>
+        }
+      />
+
+      {/* SECTION 1: USER TRACKED ASSETS */}
+      <section className="space-y-4">
+        <div>
+          <h2 className="text-base font-semibold text-white">Your Tracked Assets</h2>
+          <p className="text-xs text-neutral-400 mt-1">Manage quantity, costs, and portfolios for your registered market assets.</p>
         </div>
-      ) : <EmptyState icon={<LineChart size={18} />} title="No market assets found" description="Search a symbol or create a market asset manually." />}
-      {open ? <Modal title="Create Market Asset" onClose={() => setOpen(false)}><MarketAssetForm pending={create.isPending} onSubmit={(data) => create.mutate(data, { onSuccess: () => { toast.success("Market asset created"); setOpen(false); } })} /></Modal> : null}
+
+        {userMarketAssets.isLoading ? (
+          <SkeletonGrid count={3} />
+        ) : userMarketAssets.data?.length ? (
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {userMarketAssets.data.map((userAsset) => {
+              const asset = userAsset.marketAsset;
+              const quantity = Number(userAsset.quantity);
+              const averageCost = Number(userAsset.averageCost);
+              const totalCost = quantity * averageCost;
+
+              return (
+                <Panel key={userAsset.id} className="bg-neutral-900/60 border-white/10 hover:border-[#b5b5f6]/40 transition duration-300">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <h3 className="text-lg font-bold text-white tracking-tight">{asset.symbol}</h3>
+                      <p className="text-xs text-neutral-400 font-medium truncate max-w-45" title={asset.name}>{asset.name}</p>
+                    </div>
+                    <span className="rounded-full border border-[#b5b5f6]/20 bg-[#b5b5f6]/5 px-2 py-0.5 text-[10px] font-semibold text-[#b5b5f6] tracking-wide uppercase">
+                      {title(asset.assetType)}
+                    </span>
+                  </div>
+
+                  <div className="mt-5 grid grid-cols-2 gap-y-3 gap-x-2 text-xs border-t border-white/5 pt-4">
+                    <div>
+                      <span className="text-neutral-500 block">Shares</span>
+                      <span className="text-white font-mono font-medium">{quantity.toLocaleString(undefined, { maximumFractionDigits: 4 })}</span>
+                    </div>
+                    <div>
+                      <span className="text-neutral-500 block">Avg Cost</span>
+                      <span className="text-white font-mono font-medium">{money(averageCost, asset.currency)}</span>
+                    </div>
+                    <div>
+                      <span className="text-neutral-500 block">Total Invested</span>
+                      <span className="text-[#b5b5f6] font-mono font-semibold">{money(totalCost, asset.currency)}</span>
+                    </div>
+                    <div>
+                      <span className="text-neutral-500 block">Exchange</span>
+                      <span className="text-neutral-300 truncate block max-w-30" title={asset.exchange ?? "N/A"}>{asset.exchange ?? "N/A"}</span>
+                    </div>
+                  </div>
+
+                  <div className="mt-5 flex gap-2 border-t border-white/5 pt-4">
+                    <GhostButton onClick={() => setEditHolding(userAsset)} className="flex-1 justify-center py-1">
+                      <Pencil size={13} /> Edit
+                    </GhostButton>
+                    <GhostButton
+                      tone="danger"
+                      disabled={removeAsset.isPending}
+                      onClick={() => {
+                        removeAsset.mutate(userAsset.id, {
+                          onSuccess: () => {
+                            toast.success(`Stopped tracking ${asset.symbol}`);
+                          },
+                        });
+                      }}
+                      className="flex-1 justify-center py-1"
+                    >
+                      {removeAsset.isPending ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />} Untrack
+                    </GhostButton>
+                  </div>
+                </Panel>
+              );
+            })}
+          </div>
+        ) : (
+          <EmptyState
+            icon={<LineChart size={18} />}
+            title="No tracked assets"
+            description="Search for a symbol below or use the Search Symbols button to add stock holdings to your portfolio."
+          />
+        )}
+      </section>
+
+      <div className="border-t border-white/5 pt-8" />
+
+      {/* SECTION 2: SEARCH & ADD ASSETS */}
+      <section className="space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h2 className="text-base font-semibold text-white">Search Securities</h2>
+            <p className="text-xs text-neutral-400 mt-1">Search symbols from Finnhub or database to start tracking them.</p>
+          </div>
+          <div className="opacity-90 hover:opacity-100 transition-opacity">
+            <SearchCommand renderAs="button" label="Search Symbols Menu" initialStocks={[]} onAddStock={(stock) => setTrackTarget(stock)} />
+          </div>
+        </div>
+
+        <Panel>
+          <div className="relative">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-600" />
+            <input
+              className={cn(inputClass, "pl-9")}
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Search by symbol or name..."
+            />
+          </div>
+        </Panel>
+
+        {marketAssets.isLoading ? (
+          <SkeletonGrid />
+        ) : marketAssets.data?.length ? (
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+            {marketAssets.data.map((asset) => {
+              const isAlreadyTracked = userMarketAssets.data?.some(
+                (ua) => ua.marketAsset.symbol === asset.symbol
+              );
+
+              return (
+                <Panel key={asset.id} className="flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <h2 className="text-lg font-semibold text-white">{asset.symbol}</h2>
+                        <p className="text-xs text-neutral-500 font-medium truncate max-w-35" title={asset.name}>{asset.name}</p>
+                      </div>
+                      <span className="rounded-full border border-white/8 bg-white/3 px-2 py-0.5 text-[10px] uppercase">{title(asset.assetType)}</span>
+                    </div>
+                    <div className="mt-5 space-y-2 text-xs text-neutral-500">
+                      <p>Exchange <span className="float-right text-neutral-300 truncate max-w-25" title={asset.exchange ?? "N/A"}>{asset.exchange ?? "N/A"}</span></p>
+                      <p>Sector <span className="float-right text-neutral-300 truncate max-w-25" title={asset.sector ?? "N/A"}>{asset.sector ?? "N/A"}</span></p>
+                      <p>Currency <span className="float-right font-mono text-neutral-300">{asset.currency}</span></p>
+                    </div>
+                  </div>
+
+                  <div className="mt-5 border-t border-white/5 pt-4">
+                    {isAlreadyTracked ? (
+                      <div className="w-full text-center py-1.5 rounded-xl border border-emerald-500/20 bg-emerald-500/5 text-xs font-semibold text-emerald-400">
+                        ✓ Tracked
+                      </div>
+                    ) : (
+                      <PrimaryButton
+                        onClick={() => setTrackTarget({ symbol: asset.symbol, name: asset.name })}
+                        className="w-full justify-center text-xs py-1.5"
+                      >
+                        <Plus size={12} /> Track Asset
+                      </PrimaryButton>
+                    )}
+                  </div>
+                </Panel>
+              );
+            })}
+          </div>
+        ) : (
+          <EmptyState
+            icon={<Search size={18} />}
+            title="No securities found"
+            description="Try searching a different symbol or keyword."
+          />
+        )}
+      </section>
+
+      {/* MODALS */}
+      {open ? (
+        <Modal title="Create Market Asset" onClose={() => setOpen(false)}>
+          <MarketAssetForm
+            pending={create.isPending}
+            onSubmit={(data) =>
+              create.mutate(data, {
+                onSuccess: () => {
+                  toast.success("Market asset created");
+                  setOpen(false);
+                },
+              })
+            }
+          />
+        </Modal>
+      ) : null}
+
+      {trackTarget ? (
+        <Modal title={`Track Asset: ${trackTarget.symbol}`} onClose={() => setTrackTarget(null)}>
+          <TrackAssetForm
+            symbol={trackTarget.symbol}
+            name={trackTarget.name}
+            portfolios={portfolios.data ?? []}
+            pending={addAsset.isPending}
+            onSubmit={(data) => {
+              addAsset.mutate(
+                {
+                  symbol: data.symbol,
+                  quantity: data.quantity,
+                  averageCost: data.averageCost,
+                  portfolioId: data.portfolioId || undefined,
+                },
+                {
+                  onSuccess: () => {
+                    toast.success(`Started tracking ${trackTarget.symbol}`);
+                    setTrackTarget(null);
+                  },
+                }
+              );
+            }}
+          />
+        </Modal>
+      ) : null}
+
+      {editHolding ? (
+        <Modal title={`Edit Tracked Asset: ${editHolding.marketAsset.symbol}`} onClose={() => setEditHolding(null)}>
+          <TrackAssetForm
+            symbol={editHolding.marketAsset.symbol}
+            name={editHolding.marketAsset.name}
+            initialValues={{
+              quantity: Number(editHolding.quantity),
+              averageCost: Number(editHolding.averageCost),
+              portfolioId: editHolding.portfolios?.[0]?.portfolioId || undefined,
+            }}
+            portfolios={portfolios.data ?? []}
+            pending={addAsset.isPending}
+            onSubmit={(data) => {
+              addAsset.mutate(
+                {
+                  symbol: data.symbol,
+                  quantity: data.quantity,
+                  averageCost: data.averageCost,
+                  portfolioId: data.portfolioId || undefined,
+                },
+                {
+                  onSuccess: () => {
+                    toast.success(`Updated holding details for ${editHolding.marketAsset.symbol}`);
+                    setEditHolding(null);
+                  },
+                }
+              );
+            }}
+          />
+        </Modal>
+      ) : null}
     </div>
   );
 }
@@ -862,7 +1170,7 @@ export function PortfoliosPage() {
           {portfolios.data.map((portfolio) => (
             <Panel key={portfolio.id}>
               <div className="flex items-start justify-between gap-3"><div><h2 className="text-sm font-semibold text-white">{portfolio.name}</h2><p className="mt-1 line-clamp-2 text-xs text-neutral-500">{portfolio.description || "No description"}</p></div><span className="rounded-full border border-white/8 bg-white/3 px-2 py-1 text-[11px] text-neutral-300">{title(portfolio.visibility)}</span></div>
-              <div className="mt-5 grid grid-cols-3 gap-3 text-xs text-neutral-500"><span>Accounts <b className="block pt-1 text-neutral-300">{portfolio._count?.accounts ?? 0}</b></span><span>Assets <b className="block pt-1 text-neutral-300">{portfolio._count?.holdings ?? 0}</b></span><span>Created <b className="block pt-1 font-normal text-neutral-300">{date(portfolio.createdAt)}</b></span></div>
+              <div className="mt-5 grid grid-cols-3 gap-3 text-xs text-neutral-500"><span>Custom Assets <b className="block pt-1 text-neutral-300">{portfolio._count?.customAssets ?? 0}</b></span><span>Market Assets <b className="block pt-1 text-neutral-300">{portfolio._count?.marketAssets ?? 0}</b></span><span>Created <b className="block pt-1 font-normal text-neutral-300">{date(portfolio.createdAt)}</b></span></div>
               <div className="mt-5 flex flex-wrap gap-2"><GhostButton onClick={() => router.push(`/portfolios/${portfolio.id}`)}>View <ArrowRight size={13} /></GhostButton><GhostButton onClick={() => setEdit(portfolio)}><Pencil size={13} /> Edit</GhostButton><GhostButton tone="danger" onClick={() => remove.mutate(portfolio.id, { onSuccess: () => toast.success("Portfolio deleted") })}><Trash2 size={13} /> Delete</GhostButton></div>
             </Panel>
           ))}
@@ -879,8 +1187,11 @@ export function PortfolioDetailPage({ portfolioId }: { portfolioId: string }) {
   const portfolio = usePortfolio(portfolioId);
   const { customAssets } = useCustomAssets(portfolioId);
   const allocation = useAllocation();
-  const assetCount = customAssets.data?.length ?? portfolio.data?._count?.holdings ?? 0;
-  const portfolioValue = (customAssets.data ?? []).reduce((sum, item) => sum + item.currentValue, 0);
+  const marketAssetEntries = portfolio.data?.marketAssets ?? [];
+  const assetCount = (customAssets.data?.length ?? 0) + (portfolio.data?._count?.marketAssets ?? 0);
+  const customAssetsValue = (customAssets.data ?? []).reduce((sum, item) => sum + item.currentValue, 0);
+  const marketAssetsValue = marketAssetEntries.reduce((sum, entry) => sum + Number(entry.userMarketAsset.quantity) * Number(entry.userMarketAsset.averageCost), 0);
+  const portfolioValue = customAssetsValue + marketAssetsValue;
   if (portfolio.isLoading) return <SkeletonGrid count={4} />;
   if (portfolio.isError || !portfolio.data) return <ErrorState label="Portfolio not found." />;
   return (
@@ -892,7 +1203,7 @@ export function PortfolioDetailPage({ portfolioId }: { portfolioId: string }) {
         <Panel><h2 className="mb-4 text-sm font-semibold text-white">Custom Assets</h2>{customAssets.data?.length ? <div className="space-y-3">{customAssets.data.map((asset) => <div key={asset.id} className="flex justify-between rounded-xl border border-white/5 bg-white/2 p-3"><span className="text-sm text-white">{asset.name}</span><span className="text-sm text-[#b5b5f6]">{money(asset.currentValue, asset.currency)}</span></div>)}</div> : <EmptyState icon={<Database size={18} />} title="No custom assets" description="Assigned custom assets will appear here." />}</Panel>
         <Panel><h2 className="mb-4 text-sm font-semibold text-white">Allocation Chart</h2><div className="h-72">{allocation.data?.length ? <ResponsiveContainer><PieChart><Pie data={allocation.data} dataKey="currentValue" nameKey="symbol" innerRadius={58} outerRadius={95}>{allocation.data.map((_, index) => <Cell key={index} fill={accent[index % accent.length]} />)}</Pie><Tooltip contentStyle={{ background: "#0a0a0a", border: "1px solid rgba(255,255,255,.08)", borderRadius: 12 }} /></PieChart></ResponsiveContainer> : <EmptyState icon={<BarChart3 size={18} />} title="Allocation unavailable" description="Allocation appears when analytics data is available." />}</div></Panel>
       </div>
-      <Panel><h2 className="mb-4 text-sm font-semibold text-white">Market Assets</h2><EmptyState icon={<LineChart size={18} />} title="No market asset details" description="Market holdings will appear when the backend exposes portfolio-level holdings." /></Panel>
+      <Panel><h2 className="mb-4 text-sm font-semibold text-white">Market Assets</h2>{marketAssetEntries.length ? <div className="space-y-3">{marketAssetEntries.map((entry) => { const ua = entry.userMarketAsset; const asset = ua.marketAsset; const qty = Number(ua.quantity); const avgCost = Number(ua.averageCost); const totalInvested = qty * avgCost; return (<div key={entry.userMarketAssetId} className="flex items-center justify-between rounded-xl border border-white/5 bg-white/2 p-4 transition hover:border-white/10"><div className="flex items-center gap-3"><div><p className="text-sm font-semibold text-white">{asset.symbol}</p><p className="text-xs text-neutral-500">{asset.name}</p></div><span className="rounded-full border border-white/8 bg-white/3 px-2 py-0.5 text-[10px] uppercase text-neutral-400">{title(asset.assetType)}</span></div><div className="text-right"><p className="text-sm font-semibold text-[#b5b5f6]">{money(totalInvested, asset.currency)}</p><p className="text-[11px] text-neutral-500">{qty.toLocaleString(undefined, { maximumFractionDigits: 4 })} shares @ {money(avgCost, asset.currency)}</p></div></div>); })}</div> : <EmptyState icon={<LineChart size={18} />} title="No market assets" description="Assign market assets to this portfolio from the Market Assets page." />}</Panel>
     </div>
   );
 }

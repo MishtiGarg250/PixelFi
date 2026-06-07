@@ -12,6 +12,26 @@ export interface MarketAsset {
   updatedAt: string;
 }
 
+export interface UserMarketAsset {
+  id: string;
+  userId: string;
+  marketAssetId: string;
+  quantity: number;
+  averageCost: number;
+  createdAt: string;
+  updatedAt: string;
+  marketAsset: MarketAsset;
+  portfolios: { portfolioId: string; userMarketAssetId: string }[];
+}
+
+export interface AddUserMarketAssetInput {
+  symbol: string;
+  quantity?: number;
+  averageCost?: number;
+  portfolioId?: string;
+}
+
+
 export type CustomAssetCategory =
   | "REAL_ESTATE"
   | "VEHICLE"
@@ -115,4 +135,26 @@ export const deleteCustomAsset = async (
   assetId: string
 ): Promise<void> => {
   await api.delete(`/assets/custom/${assetId}`);
+};
+
+export const getUserMarketAssets = async (
+  api: AxiosInstance
+): Promise<UserMarketAsset[]> => {
+  const res = await api.get(`/assets/market/user`);
+  return res.data.assets as UserMarketAsset[];
+};
+
+export const addUserMarketAsset = async (
+  api: AxiosInstance,
+  data: AddUserMarketAssetInput
+): Promise<UserMarketAsset> => {
+  const res = await api.post(`/assets/market/add`, data);
+  return res.data.asset as UserMarketAsset;
+};
+
+export const deleteUserMarketAsset = async (
+  api: AxiosInstance,
+  id: string
+): Promise<void> => {
+  await api.delete(`/assets/market/user/${id}`);
 };

@@ -3,12 +3,16 @@ import { getAuth } from "@clerk/express";
 import {
   searchMarketAssetsService,
   createMarketAssetService,
+  addUserMarketAssetService,
+  getUserMarketAssetsService,
+  deleteUserMarketAssetService,
   getCustomAssetsService,
   createCustomAssetService,
   updateCustomAssetService,
   deleteCustomAssetService,
 } from "../service/asset.service.js";
 import {
+  addUserMarketAssetSchema,
   createMarketAssetSchema,
   createCustomAssetSchema,
   updateCustomAssetSchema,
@@ -37,6 +41,47 @@ export const createMarketAsset = async (req: Request, res: Response) => {
   } catch (error) {
     console.error(error);
     return res.status(500).json({ success: false, message: "Failed to create market asset" });
+  }
+};
+
+export const addUserMarketAsset = async (req: Request, res: Response) => {
+  try {
+    const userId = getAuth(req).userId as string;
+    if (!userId) return res.status(401).json({ message: "Unauthorized" });
+
+    const validatedData = addUserMarketAssetSchema.parse(req.body);
+    const asset = await addUserMarketAssetService(userId, validatedData);
+    return res.status(201).json({ success: true, asset });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ success: false, message: "Failed to add market asset" });
+  }
+};
+
+export const getUserMarketAssets = async (req: Request, res: Response) => {
+  try {
+    const userId = getAuth(req).userId as string;
+    if (!userId) return res.status(401).json({ message: "Unauthorized" });
+
+    const assets = await getUserMarketAssetsService(userId);
+    return res.status(200).json({ success: true, assets });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ success: false, message: "Failed to fetch user market assets" });
+  }
+};
+
+export const deleteUserMarketAsset = async (req: Request, res: Response) => {
+  try {
+    const userId = getAuth(req).userId as string;
+    if (!userId) return res.status(401).json({ message: "Unauthorized" });
+
+    const id = req.params.id as string;
+    await deleteUserMarketAssetService(userId, id);
+    return res.status(200).json({ success: true, message: "Tracked market asset deleted" });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ success: false, message: "Failed to delete tracked market asset" });
   }
 };
 

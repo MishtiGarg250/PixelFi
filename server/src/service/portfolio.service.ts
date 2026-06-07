@@ -71,6 +71,15 @@ export const getPortfolioByIdService = async (
           marketAssets: true,
         },
       },
+      marketAssets: {
+        include: {
+          userMarketAsset: {
+            include: {
+              marketAsset: true,
+            },
+          },
+        },
+      },
     },
   });
 

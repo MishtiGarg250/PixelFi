@@ -1,5 +1,28 @@
 import { AxiosInstance } from "axios";
 
+export interface PortfolioMarketAssetEntry {
+  portfolioId: string;
+  userMarketAssetId: string;
+  userMarketAsset: {
+    id: string;
+    userId: string;
+    marketAssetId: string;
+    quantity: number;
+    averageCost: number;
+    createdAt: string;
+    updatedAt: string;
+    marketAsset: {
+      id: string;
+      symbol: string;
+      name: string;
+      assetType: string;
+      exchange?: string | null;
+      sector?: string | null;
+      currency: string;
+    };
+  };
+}
+
 export interface Portfolio {
   id: string;
   name: string;
@@ -8,9 +31,10 @@ export interface Portfolio {
   createdAt: string;
   updatedAt: string;
   _count?: {
-    accounts: number;
-    holdings: number;
+    customAssets: number;
+    marketAssets: number;
   };
+  marketAssets?: PortfolioMarketAssetEntry[];
 }
 
 export const getPortfolios = async (api: AxiosInstance): Promise<Portfolio[]> => {

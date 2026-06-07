@@ -9,6 +9,7 @@ export const queryKeys = {
   transactions: ["transactions"] as const,
   accountTransactions: (accountId: string) => ["transactions", "account", accountId] as const,
   marketAssets: (query: string) => ["marketAssets", query] as const,
+  userMarketAssets: ["userMarketAssets"] as const,
   customAssets: (portfolioId?: string) => ["customAssets", portfolioId ?? "all"] as const,
   liabilities: ["liabilities"] as const,
   analytics: {

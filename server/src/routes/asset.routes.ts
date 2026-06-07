@@ -3,6 +3,9 @@ import { protect } from "../middleware/auth.middleware.js";
 import {
   searchMarketAssets,
   createMarketAsset,
+  addUserMarketAsset,
+  getUserMarketAssets,
+  deleteUserMarketAsset,
   getCustomAssets,
   createCustomAsset,
   updateCustomAsset,
@@ -16,6 +19,9 @@ export const marketAssetRouter = express.Router();
 
 marketAssetRouter.get("/", searchMarketAssets);           // GET /api/assets/market?q=AAPL
 marketAssetRouter.post("/", protect, createMarketAsset);  // POST /api/assets/market
+marketAssetRouter.post("/add", protect, addUserMarketAsset); // POST /api/assets/market/add
+marketAssetRouter.get("/user", protect, getUserMarketAssets); // GET /api/assets/market/user
+marketAssetRouter.delete("/user/:id", protect, deleteUserMarketAsset); // DELETE /api/assets/market/user/:id
 
 // ─────────────────────────────────────────────
 // Custom asset routes — mounted at /api/assets/custom

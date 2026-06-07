@@ -9,6 +9,13 @@ export const createMarketAssetSchema = z.object({
   currency: z.string().min(3).max(5),
 });
 
+export const addUserMarketAssetSchema = z.object({
+  symbol: z.string().min(1).max(20).toUpperCase(),
+  quantity: z.number().nonnegative().optional(),
+  averageCost: z.number().nonnegative().optional(),
+  portfolioId: z.string().optional(),
+});
+
 export const createCustomAssetSchema = z.object({
   name: z.string().min(1).max(255),
   description: z.string().max(1000).optional(),
