@@ -1,4 +1,5 @@
 import prisma from "../lib/prisma.js";
+import { getCurrentPrice } from "../utils/finhub.helper.js";
 
 const MARKET_PRICES: Record<string, number> = {
   AAPL: 220,
@@ -37,59 +38,62 @@ export const getNetWorthService = async (
     });
 
   const customAssets = await prisma.customAsset.findMany({
-      where: {
-        userId: user.id,
-      },
-    });
-
-  const liabilities = await prisma.liability.findMany({
-      where: {
-        userId: user.id,
-      },
-    });
-
-  const holdings = marketAssets.map((asset) => {
-    const quantity = Number(asset.quantity);
-
-    const averageCost = Number(asset.averageCost);
-
-    const symbol =
-      asset.marketAsset.symbol;
-
-    const currentPrice =
-      MARKET_PRICES[symbol] ??
-      averageCost;
-
-    const currentValue =
-      quantity * currentPrice;
-
-    return {
-      marketAssetId:
-        asset.marketAsset.id,
-      symbol,
-      assetName:
-        asset.marketAsset.name,
-      quantity,
-      averageCost,
-      currentPrice,
-      currentValue,
-    };
+    where: {
+      userId: user.id,
+    },
   });
 
+  const liabilities = await prisma.liability.findMany({
+    where: {
+      userId: user.id,
+    },
+  });
+
+  const holdings = await Promise.all(
+    marketAssets.map(async (asset) => {
+      const quantity = Number(asset.quantity);
+      const averageCost = Number(asset.averageCost);
+      const symbol = asset.marketAsset.symbol;
+
+      let currentPrice = averageCost;
+
+      try {
+        currentPrice = await getCurrentPrice(symbol);
+      } catch (error) {
+        console.error(
+          `Failed to fetch price for ${symbol}`,
+          error
+        );
+      }
+
+      const currentValue = quantity * currentPrice;
+
+      return {
+        marketAssetId: asset.marketAsset.id,
+        symbol,
+        assetName: asset.marketAsset.name,
+        quantity,
+        averageCost,
+        currentPrice,
+        currentValue,
+      };
+    })
+  );
+
   const marketAssetsValue = holdings.reduce(
-      (sum, holding) =>
-        sum + holding.currentValue,
-      0
-    );
+    (sum, holding) =>
+      sum + holding.currentValue,
+    0
+  );
 
   const customAssetsValue = customAssets.reduce(
-      (sum, asset) =>
-        sum +
-        Number(asset.currentValue),
-      0
-    );
+    (sum, asset) =>
+      sum +
+      Number(asset.currentValue),
+    0
+  );
 
-  const totalAssets =marketAssetsValue +customAssetsValue;
+  const totalAssets = marketAssetsValue + customAssetsValue;
 
   const totalLiabilities =
     liabilities.reduce(
@@ -99,7 +103,7 @@ export const getNetWorthService = async (
       0
     );
 
-  const totalNetWorth =totalAssets -totalLiabilities;
+  const totalNetWorth = totalAssets - totalLiabilities;
 
   return {
     totalAssets,
@@ -120,77 +124,92 @@ export const getNetWorthService = async (
 
 
 
-export const getAllocationService =
-  async (clerkUserId: string) => {
-    const user =await resolveUser(clerkUserId);
+export const getAllocationService = async (
+  clerkUserId: string
+) => {
+  const user = await resolveUser(clerkUserId);
 
-    const marketAssets = await prisma.userMarketAsset.findMany({
-        where: {
-          userId: user.id,
-        },
-        include: {
-          marketAsset: true,
-        },
-      });
+  const marketAssets =
+    await prisma.userMarketAsset.findMany({
+      where: {
+        userId: user.id,
+      },
+      include: {
+        marketAsset: true,
+      },
+    });
 
-    const customAssets = await prisma.customAsset.findMany({
-        where: {
-          userId: user.id,
-        },
-      });
+  const customAssets =
+    await prisma.customAsset.findMany({
+      where: {
+        userId: user.id,
+      },
+    });
 
-    const allocations: {
-      symbol: string;
-      currentValue: number;
-    }[] = [];
-
-    for (const asset of marketAssets) {
+  const marketAllocations = await Promise.all(
+    marketAssets.map(async (asset) => {
       const symbol = asset.marketAsset.symbol;
 
-      const currentPrice =MARKET_PRICES[symbol] ?? Number(asset.averageCost);
+      let currentPrice = Number(
+        asset.averageCost
+      );
 
-      allocations.push({
+      try {
+        currentPrice =
+          await getCurrentPrice(symbol);
+      } catch (error) {
+        console.error(
+          `Failed to fetch price for ${symbol}`,
+          error
+        );
+      }
+
+      return {
         symbol,
         currentValue:
           Number(asset.quantity) *
           currentPrice,
-      });
-    }
+      };
+    })
+  );
 
-    for (const asset of customAssets) {
-      allocations.push({
-        symbol: asset.name,
-        currentValue:
-          Number(asset.currentValue),
-      });
-    }
+  const customAllocations =
+    customAssets.map((asset) => ({
+      symbol: asset.name,
+      currentValue: Number(
+        asset.currentValue
+      ),
+    }));
 
-    const totalValue =
-      allocations.reduce(
-        (sum, item) =>
-          sum + item.currentValue,
-        0
-      );
+  const allocations = [
+    ...marketAllocations,
+    ...customAllocations,
+  ];
 
-    return allocations.map(
-      (allocation) => ({
-        symbol:
-          allocation.symbol,
-        currentValue:
-          allocation.currentValue,
-        allocationPercent:
-          totalValue === 0
-            ? 0
-            : Number(
-                (
-                  (allocation.currentValue /
-                    totalValue) *
-                  100
-                ).toFixed(2)
-              ),
-      })
-    );
-  };
+  const totalValue = allocations.reduce(
+    (sum, item) =>
+      sum + item.currentValue,
+    0
+  );
+
+  return allocations.map(
+    (allocation) => ({
+      symbol: allocation.symbol,
+      currentValue:
+        allocation.currentValue,
+      allocationPercent:
+        totalValue === 0
+          ? 0
+          : Number(
+              (
+                (allocation.currentValue /
+                  totalValue) *
+                100
+              ).toFixed(2)
+            ),
+    })
+  );
+};
 
 
 
@@ -199,36 +218,54 @@ export const getPerformanceService =
     const user = await resolveUser(clerkUserId);
 
     const marketAssets = await prisma.userMarketAsset.findMany({
-        where: {
-          userId: user.id,
-        },
-        include: {
-          marketAsset: true,
-        },
-      });
+      where: {
+        userId: user.id,
+      },
+      include: {
+        marketAsset: true,
+      },
+    });
 
-    return marketAssets.map(
-      (asset) => {
+    return Promise.all(
+      marketAssets.map(async (asset) => {
         const quantity = Number(asset.quantity);
 
-        const averageCost = Number(asset.averageCost);
+        const averageCost =
+          Number(asset.averageCost);
 
-        const investedAmount = quantity *averageCost;
+        const investedAmount =
+          quantity * averageCost;
 
-        const symbol = asset.marketAsset.symbol;
+        const symbol =
+          asset.marketAsset.symbol;
 
-        const currentPrice = MARKET_PRICES[symbol] ?? averageCost;
+        let currentPrice = averageCost;
 
-        const currentValue = quantity *currentPrice;
+        try {
+          currentPrice =
+            await getCurrentPrice(symbol);
+        } catch (error) {
+          console.error(
+            `Failed to fetch price for ${symbol}`,
+            error
+          );
+        }
 
-        const pnl = currentValue - investedAmount;
+        const currentValue =
+          quantity * currentPrice;
 
-        const pnlPercent = investedAmount === 0 ? 0 : Number((
-                  (pnl /
-                    investedAmount) *
-                  100
-                ).toFixed(2)
-              );
+        const pnl =
+          currentValue - investedAmount;
+
+        const pnlPercent =
+          investedAmount === 0
+            ? 0
+            : Number(
+              (
+                (pnl / investedAmount) *
+                100
+              ).toFixed(2)
+            );
 
         return {
           symbol,
@@ -237,7 +274,7 @@ export const getPerformanceService =
           pnl,
           pnlPercent,
         };
-      }
+      })
     );
   };
 
@@ -326,8 +363,8 @@ export const getRiskScoreService =
         score > 60
           ? "HIGH"
           : score > 30
-          ? "MEDIUM"
-          : "LOW",
+            ? "MEDIUM"
+            : "LOW",
     };
   };
 
@@ -337,16 +374,16 @@ export const getDiversificationService =
     const user = await resolveUser(clerkUserId);
 
     const marketAssets = await prisma.userMarketAsset.count({
-        where: {
-          userId: user.id,
-        },
-      });
+      where: {
+        userId: user.id,
+      },
+    });
 
     const customAssets = await prisma.customAsset.count({
-        where: {
-          userId: user.id,
-        },
-      });
+      where: {
+        userId: user.id,
+      },
+    });
 
     const totalAssets = marketAssets + customAssets;
 
