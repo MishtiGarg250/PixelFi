@@ -5,6 +5,7 @@ interface CreateAccountInput {
   brokerName?: string | undefined;
   accountType: "BROKERAGE" | "BANK" | "CRYPTO";
   currency: string;
+  currentBalance?: number;
 }
 
 async function resolveUser(clerkUserId: string) {
@@ -26,6 +27,7 @@ export const createAccountService = async (
       brokerName: data.brokerName ?? null,
       accountType: data.accountType,
       currency: data.currency,
+      currentBalance: data.currentBalance ?? 0,
     },
   });
 

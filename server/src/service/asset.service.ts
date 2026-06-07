@@ -24,8 +24,6 @@ interface CreateMarketAssetInput {
 
 interface AddUserMarketAssetInput {
   symbol: string;
-  quantity?: number | undefined;
-  averageCost?: number | undefined;
   portfolioId?: string | undefined;
 }
 
@@ -149,59 +147,70 @@ export const addUserMarketAssetService = async (
 
   if (data.portfolioId) {
     const portfolio = await prisma.portfolio.findFirst({
-      where: { id: data.portfolioId, userId: user.id },
+      where: {
+        id: data.portfolioId,
+        userId: user.id,
+      },
     });
-    if (!portfolio)
-      throw new Error("Portfolio not found or does not belong to user");
+
+    if (!portfolio) {
+      throw new Error(
+        "Portfolio not found or does not belong to user"
+      );
+    }
   }
 
-  const marketAsset = await resolveMarketAssetFromFinnhub(data.symbol);
-  const quote = data.averageCost === undefined
-    ? await getQuoteService(marketAsset.symbol).catch(() => null)
-    : null;
+  const marketAsset =
+    await resolveMarketAssetFromFinnhub(
+      data.symbol
+    );
 
-  const existing = await prisma.userMarketAsset.findUnique({
-    where: {
-      userId_marketAssetId: {
-        userId: user.id,
-        marketAssetId: marketAsset.id,
-      },
-    },
-  });
-
-  const userMarketAsset = existing
-    ? await prisma.userMarketAsset.update({
-        where: { id: existing.id },
-        data: {
-          ...(data.quantity !== undefined && { quantity: data.quantity }),
-          ...(data.averageCost !== undefined && {
-            averageCost: data.averageCost,
-          }),
+  let userMarketAsset =
+    await prisma.userMarketAsset.findUnique({
+      where: {
+        userId_marketAssetId: {
+          userId: user.id,
+          marketAssetId: marketAsset.id,
         },
-        include: { marketAsset: true },
-      })
-    : await prisma.userMarketAsset.create({
+      },
+      include: {
+        marketAsset: true,
+      },
+    });
+
+  if (!userMarketAsset) {
+    userMarketAsset =
+      await prisma.userMarketAsset.create({
         data: {
           userId: user.id,
           marketAssetId: marketAsset.id,
-          quantity: data.quantity ?? 0,
-          averageCost: data.averageCost ?? quote?.price ?? 0,
+
+          // Holdings are maintained by transactions
+          quantity: 0,
+          averageCost: 0,
         },
-        include: { marketAsset: true },
+        include: {
+          marketAsset: true,
+        },
       });
+  }
 
   if (data.portfolioId) {
     await prisma.portfolioMarketAsset.upsert({
       where: {
         portfolioId_userMarketAssetId: {
           portfolioId: data.portfolioId,
-          userMarketAssetId: userMarketAsset.id,
+          userMarketAssetId:
+            userMarketAsset.id,
         },
       },
+
       update: {},
+
       create: {
         portfolioId: data.portfolioId,
-        userMarketAssetId: userMarketAsset.id,
+        userMarketAssetId:
+          userMarketAsset.id,
       },
     });
   }
@@ -226,20 +235,39 @@ export const deleteUserMarketAssetService = async (
   userMarketAssetId: string
 ) => {
   const user = await resolveUser(clerkUserId);
-  const existing = await prisma.userMarketAsset.findFirst({
-    where: { id: userMarketAssetId, userId: user.id },
-  });
+
+  const existing =
+    await prisma.userMarketAsset.findFirst({
+      where: {
+        id: userMarketAssetId,
+        userId: user.id,
+      },
+    });
+
   if (!existing) {
-    throw new Error("Tracked asset not found or does not belong to user");
+    throw new Error(
+      "Tracked asset not found or does not belong to user"
+    );
   }
 
-  // Delete associated PortfolioMarketAsset links if any
-  await prisma.portfolioMarketAsset.deleteMany({
-    where: { userMarketAssetId },
-  });
+  if (Number(existing.quantity) > 0) {
+    throw new Error(
+      "Cannot delete asset with active holdings. Sell all shares first."
+    );
+  }
 
-  await prisma.userMarketAsset.delete({
-    where: { id: userMarketAssetId },
+  await prisma.$transaction(async (tx) => {
+    await tx.portfolioMarketAsset.deleteMany({
+      where: {
+        userMarketAssetId,
+      },
+    });
+
+    await tx.userMarketAsset.delete({
+      where: {
+        id: userMarketAssetId,
+      },
+    });
   });
 };
 

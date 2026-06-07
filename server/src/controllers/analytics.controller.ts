@@ -217,3 +217,22 @@ export const getDiversification = async (req: Request,res: Response) => {
       });
     }
   };
+
+
+  // health -score
+
+  export const getFinancialHealthScore = async(
+    req: Request,
+    res: Response,
+  )=>{
+    try{
+      const {userId}= getAuth(req);
+      if(!userId){
+        return res.status(401).json({
+          message:"Unauthorised",
+        });
+      }
+    }catch(error){
+      
+    }
+  }

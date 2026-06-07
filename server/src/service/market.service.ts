@@ -91,3 +91,4 @@ export const searchFinnhubSymbolsService = async (query: string) => {
     .filter((result: { symbol: string; name: string }) => result.symbol && result.name)
     .slice(0, 20);
 };
+

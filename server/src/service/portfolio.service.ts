@@ -3,11 +3,13 @@ import prisma from "../lib/prisma.js";
 interface CreatePortfolioInput {
   name: string;
   description?: string | undefined;
+  visibility?: "PRIVATE" | "PUBLIC";
 }
 
 interface UpdatePortfolioInput {
   name?: string | undefined;
   description?: string | null | undefined;
+  visibility?: "PRIVATE" | "PUBLIC";
 }
 
 export const createPortfolioService = async (
@@ -18,6 +20,7 @@ export const createPortfolioService = async (
     data: {
       name: data.name,
       description: data.description ?? null,
+      visibility: data.visibility ?? "PRIVATE",
 
       user: {
         connect: {
@@ -71,6 +74,8 @@ export const getPortfolioByIdService = async (
           marketAssets: true,
         },
       },
+
+      customAssets: true,
       marketAssets: {
         include: {
           userMarketAsset: {
@@ -80,11 +85,34 @@ export const getPortfolioByIdService = async (
           },
         },
       },
-    },
-  });
+    }
 
+  });
   if (!portfolio) throw new Error("Portfolio not found");
-  return portfolio;
+  const customAssetValue = portfolio.customAssets.reduce(
+    (sum, asset) =>
+      sum + Number(asset.currentValue),
+    0
+  );
+
+  const marketAssetValue = portfolio.marketAssets.reduce((sum, item) => {
+    const holding =
+      item.userMarketAsset;
+
+    return (
+      sum + Number(holding.quantity) * Number(holding.averageCost)
+    );
+  },
+    0
+  );
+
+  const totalValue = customAssetValue + marketAssetValue;
+
+
+  return {
+    ...portfolio,
+    totalValue,
+  };
 };
 
 export const updatePortfolioService = async (
@@ -105,6 +133,7 @@ export const updatePortfolioService = async (
     data: {
       ...(data.name !== undefined && { name: data.name }),
       ...(data.description !== undefined && { description: data.description }),
+      ...(data.visibility !== undefined && { visibility: data.visibility, })
     },
   });
 
@@ -123,8 +152,26 @@ export const deletePortfolioService = async (
   });
   if (!portfolio) throw new Error("Portfolio not found or does not belong to user");
 
-  // Cascade: remove portfolio-market-asset join records
-  await prisma.portfolioMarketAsset.deleteMany({ where: { portfolioId } });
-  await prisma.customAsset.deleteMany({ where: { portfolioId } });
-  await prisma.portfolio.delete({ where: { id: portfolioId } });
+  await prisma.$transaction(async (tx) => {
+    await tx.portfolioMarketAsset.deleteMany({
+      where: {
+        portfolioId,
+      }
+    });
+
+    await tx.customAsset.updateMany({
+      where: {
+        portfolioId,
+      },
+      data: {
+        portfolioId: null,
+      }
+    });
+
+    await tx.portfolio.delete({
+      where: {
+        id: portfolioId,
+      }
+    })
+  });
 };
