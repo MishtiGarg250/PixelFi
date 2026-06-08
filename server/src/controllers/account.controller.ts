@@ -70,9 +70,9 @@ export const updateAccount = async (req: Request, res: Response) => {
     const { currentBalance, name, brokerName } = req.body;
 
     const account = await updateAccountService(userId, accountId, {
-      currentBalance: currentBalance !== undefined ? Number(currentBalance) : undefined,
-      name,
-      brokerName,
+      ...(currentBalance !== undefined && { currentBalance: Number(currentBalance) }),
+      ...(name !== undefined && { name }),
+      ...(brokerName !== undefined && { brokerName }),
     });
 
     return res.status(200).json({ success: true, account });

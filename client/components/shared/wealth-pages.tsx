@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
@@ -2249,25 +2249,156 @@ export function AnalyticsPage() {
 }
 
 export function SettingsPage() {
-  const { user } = useUser();
+  const { user, update } = useUser();
   const profile = user.data;
+  const [activeTab, setActiveTab] = useState("Profile");
+
+  const tabs = [
+    { id: "Profile", icon: <User size={16} /> },
+    { id: "Danger Zone", icon: <AlertCircle size={16} /> },
+  ];
+
+  type ProfileFormValues = z.infer<typeof profileSchema>;
+  const profileSchema = z.object({
+    firstName: z.string().optional(),
+    lastName: z.string().optional(),
+    username: z.string().optional(),
+    baseCurrency: z.string().min(3).max(5).optional(),
+  });
+
+  const form = useForm<ProfileFormValues>({
+    resolver: zodResolver(profileSchema) as any,
+    defaultValues: {
+      firstName: profile?.firstName || "",
+      lastName: profile?.lastName || "",
+      username: profile?.username || "",
+      baseCurrency: profile?.baseCurrency || "USD",
+    },
+  });
+
+  useEffect(() => {
+    if (profile) {
+      form.reset({
+        firstName: profile.firstName || "",
+        lastName: profile.lastName || "",
+        username: profile.username || "",
+        baseCurrency: profile.baseCurrency || "USD",
+      });
+    }
+  }, [profile, form]);
+
+  const onSubmit = (data: ProfileFormValues) => {
+    update.mutate(data, {
+      onSuccess: () => toast.success("Profile updated successfully"),
+      onError: (err: any) => toast.error(err.response?.data?.message || err.message || "Failed to update profile"),
+    });
+  };
+
   return (
     <div className="space-y-8">
-      <PageHeader title="Settings" description="Review profile information synced from your authenticated PixelFi account." />
-      <Panel className="max-w-3xl">
-        <div className="flex items-center gap-4 border-b border-white/5 pb-5">
-          <div className="relative h-16 w-16 overflow-hidden rounded-2xl border border-white/10 bg-white/5">
-            {profile?.imageUrl ? <Image src={profile.imageUrl} alt="" fill sizes="64px" className="object-cover" /> : null}
-          </div>
-          <div><h2 className="text-lg font-semibold text-white">{profile?.firstName || profile?.username || "Investor"} {profile?.lastName ?? ""}</h2><p className="text-sm text-neutral-500">{profile?.email ?? "No email"}</p></div>
+      <PageHeader title="Settings" description="Manage your profile, preferences, and security settings." />
+      
+      <div className="flex flex-col gap-8 md:flex-row">
+        {/* Sidebar Tabs */}
+        <aside className="flex w-full shrink-0 flex-col gap-1 md:w-56">
+          {tabs.map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={cn(
+                "flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-all duration-200",
+                activeTab === tab.id
+                  ? "bg-white/10 text-white shadow-sm"
+                  : "text-neutral-400 hover:bg-white/5 hover:text-white"
+              )}
+            >
+              <div className={cn(
+                "flex h-7 w-7 items-center justify-center rounded-lg transition-colors",
+                activeTab === tab.id ? "bg-[#b5b5f6]/20 text-[#b5b5f6]" : "bg-white/5"
+              )}>
+                {tab.icon}
+              </div>
+              {tab.id}
+            </button>
+          ))}
+        </aside>
+
+        {/* Content Area */}
+        <div className="flex-1">
+          {activeTab === "Profile" && (
+            <Panel className="max-w-2xl animate-in fade-in slide-in-from-bottom-4 duration-500">
+              <div className="flex items-center gap-4 border-b border-white/5 pb-6">
+                <div className="relative flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-white/10 bg-white/5">
+                  {profile?.imageUrl ? (
+                    <Image src={profile.imageUrl} alt="" fill sizes="80px" className="object-cover" />
+                  ) : (
+                    <User size={32} className="text-neutral-500" />
+                  )}
+                </div>
+                <div>
+                  <h2 className="text-xl font-semibold text-white">
+                    {profile?.firstName || profile?.username || "Investor"} {profile?.lastName ?? ""}
+                  </h2>
+                  <p className="mt-1 text-sm text-neutral-400">{profile?.email ?? "No email associated"}</p>
+                </div>
+              </div>
+
+              <form onSubmit={form.handleSubmit(onSubmit)} className="mt-6 space-y-6">
+                <div className="grid gap-6 sm:grid-cols-2">
+                  <Field label="First Name" error={form.formState.errors.firstName?.message}>
+                    <input className={inputClass} placeholder="John" {...form.register("firstName")} />
+                  </Field>
+                  <Field label="Last Name" error={form.formState.errors.lastName?.message}>
+                    <input className={inputClass} placeholder="Doe" {...form.register("lastName")} />
+                  </Field>
+                </div>
+
+                <div className="grid gap-6 sm:grid-cols-2">
+                  <Field label="Username" error={form.formState.errors.username?.message}>
+                    <input className={inputClass} placeholder="johndoe" {...form.register("username")} />
+                  </Field>
+                  <Field label="Base Currency" error={form.formState.errors.baseCurrency?.message}>
+                    <select className={selectClass} {...form.register("baseCurrency")}>
+                      <option value="USD">USD - US Dollar</option>
+                      <option value="EUR">EUR - Euro</option>
+                      <option value="GBP">GBP - British Pound</option>
+                      <option value="CAD">CAD - Canadian Dollar</option>
+                      <option value="AUD">AUD - Australian Dollar</option>
+                      <option value="JPY">JPY - Japanese Yen</option>
+                      <option value="INR">INR - Indian Rupee</option>
+                    </select>
+                  </Field>
+                </div>
+
+                <div className="flex items-center justify-end border-t border-white/5 pt-6">
+                  <button
+                    type="submit"
+                    disabled={update.isPending}
+                    className="flex h-10 items-center justify-center gap-2 rounded-xl bg-[#b5b5f6] px-6 text-sm font-semibold text-black transition hover:bg-[#c6c6f7] disabled:opacity-50"
+                  >
+                    {update.isPending ? <Loader2 size={16} className="animate-spin" /> : "Save Changes"}
+                  </button>
+                </div>
+              </form>
+            </Panel>
+          )}
+
+          {activeTab === "Danger Zone" && (
+            <Panel className="max-w-2xl border border-red-500/20 bg-red-500/5 animate-in fade-in slide-in-from-bottom-4 duration-500">
+              <h2 className="mb-2 text-lg font-semibold text-red-400">Danger Zone</h2>
+              <p className="mb-6 text-sm text-red-400/80">Irreversible actions regarding your account and data.</p>
+              
+              <div className="rounded-xl border border-red-500/10 bg-red-500/10 p-5">
+                <h3 className="font-medium text-white">Delete Account</h3>
+                <p className="mb-4 mt-1 text-sm text-neutral-400">Permanently delete your account, including all financial records and synced data. This action cannot be undone.</p>
+                <button className="flex h-10 items-center justify-center gap-2 rounded-xl bg-red-500/20 px-4 text-sm font-medium text-red-400 transition hover:bg-red-500/30">
+                  <Trash2 size={16} /> Delete Account
+                </button>
+              </div>
+            </Panel>
+          )}
         </div>
-        <div className="mt-5 grid gap-4 sm:grid-cols-2">
-          <StatCard label="Email" value={<span className="break-all text-base">{profile?.email ?? "N/A"}</span>} />
-          <StatCard label="Username" value={<span className="text-base">{profile?.username ?? "N/A"}</span>} />
-          <StatCard label="Avatar" value={<span className="text-base">{profile?.imageUrl ? "Configured" : "Not set"}</span>} />
-          <StatCard label="Base Currency" value={<span className="text-base">USD</span>} sub="Profile preference placeholder" />
-        </div>
-      </Panel>
+      </div>
     </div>
   );
 }
