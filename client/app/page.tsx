@@ -36,13 +36,18 @@ export default function HomePage() {
           </div>
 
           <div className="hidden items-center gap-8 md:flex">
-            {["Features", "Dashboard", "Pricing", "About"].map((link) => (
+            {[
+              { label: "Features", href: "#features" },
+              { label: "Dashboard", href: "/dashboard" },
+              { label: "Pricing", href: "#pricing" },
+              { label: "About", href: "#about" },
+            ].map((link) => (
               <a
-                key={link}
-                href="#"
+                key={link.label}
+                href={link.href}
                 className="text-xs font-medium tracking-wide uppercase text-neutral-400 transition-colors duration-200 hover:text-white"
               >
-                {link}
+                {link.label}
               </a>
             ))}
           </div>

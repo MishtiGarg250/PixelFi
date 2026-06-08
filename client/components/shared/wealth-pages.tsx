@@ -48,6 +48,7 @@ import { useCustomAssets, useMarketAssets, useUserMarketAssets } from "@/hooks/u
 import { useLiabilities } from "@/hooks/useLiabilities";
 import { usePortfolio, usePortfolios } from "@/hooks/usePortfolio";
 import { useTransactions } from "@/hooks/useTransaction";
+import { useExpenses } from "@/hooks/useExpense";
 import { useUser } from "@/hooks/useUser";
 import type { Account } from "@/services/account.service";
 import type {
@@ -60,6 +61,7 @@ import type {
 import type { Liability } from "@/services/liability.service";
 import type { Portfolio } from "@/services/portfolio.service";
 import type { Transaction, TransactionType } from "@/services/transaction.service";
+import type { Expense, CreateExpenseInput, ExpenseCategory } from "@/services/expense.service";
 import SearchCommand from "./SearchCommand";
 
 const accent = ["#b5b5f6", "#f7bff4", "#d8c4ff", "#a7f3d0", "#93c5fd", "#fcd34d"];
@@ -68,6 +70,7 @@ const accountTypes = ["BROKERAGE", "BANK", "CRYPTO"] as const;
 const liabilityTypes = ["MORTGAGE", "CAR_LOAN", "PERSONAL_LOAN", "CREDIT_CARD", "OTHER"] as const;
 const customCategories = ["REAL_ESTATE", "VEHICLE", "LUXURY_ITEM", "ART", "COLLECTIBLE", "OTHER"] as const;
 const marketAssetTypes = ["STOCK", "ETF", "CRYPTO", "BOND", "MUTUAL_FUND"] as const;
+const expenseCategories = ["FOOD", "RENT", "TRAVEL", "SHOPPING", "UTILITIES", "HEALTHCARE", "OTHER"] as const;
 
 function money(value?: number | null, currency = "USD") {
   return new Intl.NumberFormat("en-US", {
@@ -581,8 +584,26 @@ function CustomAssetForm({
   );
 }
 
+// ─────────────────────────────────────────────────────────────
+// TRANSACTION FORM — Smart multi-mode, field-adaptive
+// ─────────────────────────────────────────────────────────────
+
+// Modes as seen by the user
+type TxMode = "BUY" | "SELL" | "DEPOSIT" | "WITHDRAWAL" | "DIVIDEND" | "INTEREST" | "TRANSFER" | "EXPENSE";
+
+const TX_MODE_META: Record<TxMode, { label: string; description: string; color: string; needsAsset: boolean; needsQtyPrice: boolean; needsAmount: boolean; needsFees: boolean; needsDestAccount: boolean; isExpense: boolean }> = {
+  BUY:        { label: "Buy",        description: "Purchase a market asset (stock, ETF, crypto…)",   color: "text-emerald-400",  needsAsset: true,  needsQtyPrice: true,  needsAmount: false, needsFees: true,  needsDestAccount: false, isExpense: false },
+  SELL:       { label: "Sell",       description: "Sell shares / units of a held asset",              color: "text-red-400",      needsAsset: true,  needsQtyPrice: true,  needsAmount: false, needsFees: true,  needsDestAccount: false, isExpense: false },
+  DEPOSIT:    { label: "Deposit",    description: "Cash deposit into an account",                    color: "text-[#b5b5f6]",   needsAsset: false, needsQtyPrice: false, needsAmount: true,  needsFees: false, needsDestAccount: false, isExpense: false },
+  WITHDRAWAL: { label: "Withdrawal", description: "Cash withdrawal from an account",                 color: "text-orange-400",   needsAsset: false, needsQtyPrice: false, needsAmount: true,  needsFees: false, needsDestAccount: false, isExpense: false },
+  TRANSFER:   { label: "Transfer",   description: "Move funds between two of your accounts",         color: "text-sky-400",      needsAsset: false, needsQtyPrice: false, needsAmount: true,  needsFees: false, needsDestAccount: true,  isExpense: false },
+  DIVIDEND:   { label: "Dividend",   description: "Dividend income from an asset",                   color: "text-yellow-400",   needsAsset: true,  needsQtyPrice: false, needsAmount: true,  needsFees: false, needsDestAccount: false, isExpense: false },
+  INTEREST:   { label: "Interest",   description: "Interest credited to your account",               color: "text-cyan-400",     needsAsset: false, needsQtyPrice: false, needsAmount: true,  needsFees: false, needsDestAccount: false, isExpense: false },
+  EXPENSE:    { label: "Expense",    description: "Record an expense (food, rent, travel…)",         color: "text-[#f7bff4]",   needsAsset: false, needsQtyPrice: false, needsAmount: true,  needsFees: false, needsDestAccount: false, isExpense: true  },
+};
+
 const transactionSchema = z.object({
-  accountId: z.string().min(1),
+  accountId: z.string().min(1, "Account is required"),
   marketAssetId: z.string().optional(),
   type: z.enum(transactionTypes),
   quantity: z.coerce.number().nonnegative().optional(),
@@ -593,107 +614,572 @@ const transactionSchema = z.object({
   executedAt: z.string().min(1),
 });
 
-function TransactionForm({
+const expenseSchema = z.object({
+  accountId: z.string().optional(),
+  category: z.enum(expenseCategories),
+  title: z.string().optional(),
+  amount: z.coerce.number().positive("Amount must be > 0"),
+  currency: z.string().min(3).max(5),
+  occurredAt: z.string().min(1),
+});
+
+function ModeButton({ mode, active, onClick }: { mode: TxMode; active: boolean; onClick: () => void }) {
+  const meta = TX_MODE_META[mode];
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "flex flex-col items-start gap-0.5 rounded-xl border px-3 py-2.5 text-left transition-all duration-150",
+        active
+          ? "border-[#b5b5f6]/50 bg-[#b5b5f6]/10 ring-1 ring-[#b5b5f6]/20"
+          : "border-white/8 bg-white/2 hover:border-white/15 hover:bg-white/4"
+      )}
+    >
+      <span className={cn("text-xs font-semibold", active ? meta.color : "text-neutral-300")}>{meta.label}</span>
+    </button>
+  );
+}
+
+function SmartTransactionForm({
   accounts,
   marketAssets,
   onSearch,
-  onSubmit,
-  pending,
+  onSubmitTransaction,
+  onSubmitExpense,
+  pendingTx,
+  pendingExp,
 }: {
   accounts: Account[];
   marketAssets: MarketAsset[];
   onSearch: (value: string) => void;
-  onSubmit: (data: z.infer<typeof transactionSchema>) => void;
-  pending: boolean;
+  onSubmitTransaction: (data: z.infer<typeof transactionSchema>) => void;
+  onSubmitExpense: (data: CreateExpenseInput) => void;
+  pendingTx: boolean;
+  pendingExp: boolean;
 }) {
-  type TransactionFormValues = z.infer<typeof transactionSchema>;
+  const [mode, setMode] = useState<TxMode>("BUY");
+  const meta = TX_MODE_META[mode];
 
-  const form = useForm<TransactionFormValues>({
+  // ── Transaction form ──────────────────────────────
+  const txForm = useForm<z.infer<typeof transactionSchema>>({
     resolver: zodResolver(transactionSchema) as any,
     defaultValues: {
       accountId: accounts[0]?.id ?? "",
       type: "BUY",
-      currency: "USD",
+      currency: accounts[0]?.currency ?? "USD",
       executedAt: new Date().toISOString().slice(0, 10),
     },
   });
-  const selectedMarketAssetId = useWatch({ control: form.control, name: "marketAssetId" });
+  const selectedAccountId = useWatch({ control: txForm.control, name: "accountId" });
+  const selectedMarketAssetId = useWatch({ control: txForm.control, name: "marketAssetId" });
+  const selectedAccount = accounts.find((a) => a.id === selectedAccountId);
+
+  // ── Expense form ──────────────────────────────────
+  const expForm = useForm<z.infer<typeof expenseSchema>>({
+    resolver: zodResolver(expenseSchema) as any,
+    defaultValues: {
+      category: "OTHER",
+      currency: accounts[0]?.currency ?? "USD",
+      occurredAt: new Date().toISOString().slice(0, 10),
+    },
+  });
+
+  // Sync mode → transaction type field
+  const handleModeChange = (m: TxMode) => {
+    setMode(m);
+    if (m !== "EXPENSE") {
+      txForm.setValue("type", m as TransactionType);
+      txForm.clearErrors();
+    }
+  };
+
+  const handleTxSubmit = txForm.handleSubmit((data) => {
+    onSubmitTransaction({
+      ...data,
+      currency: data.currency.toUpperCase(),
+      executedAt: new Date(data.executedAt).toISOString(),
+      marketAssetId: data.marketAssetId || undefined,
+    });
+  });
+
+  const handleExpSubmit = expForm.handleSubmit((data) => {
+    onSubmitExpense({
+      category: data.category,
+      title: data.title || undefined,
+      amount: data.amount,
+      currency: data.currency.toUpperCase(),
+      occurredAt: new Date(data.occurredAt).toISOString(),
+      accountId: data.accountId || undefined,
+    });
+  });
+
+  // Account type determines which asset types are most relevant
+  const accountType = selectedAccount?.accountType;
+  const assetPlaceholder =
+    accountType === "CRYPTO" ? "BTC, ETH, SOL…" :
+    accountType === "BROKERAGE" ? "AAPL, MSFT, SPY…" :
+    "AAPL, BTC, SPY…";
+
   return (
-    <form
-      onSubmit={form.handleSubmit((data) => onSubmit({ ...data, currency: data.currency.toUpperCase(), executedAt: new Date(data.executedAt).toISOString() }))}
-      className="space-y-4"
-    >
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="Account" error={form.formState.errors.accountId?.message}>
-          <select className={selectClass} {...form.register("accountId")}>
-            <option value="">Select account</option>
-            {accounts.map((account) => <option key={account.id} value={account.id}>{account.name}</option>)}
-          </select>
-        </Field>
-        <Field label="Type" error={form.formState.errors.type?.message}>
-          <select className={selectClass} {...form.register("type")}>{transactionTypes.map((value) => <option key={value} value={value}>{title(value)}</option>)}</select>
-        </Field>
-        <Field label="Quantity" error={form.formState.errors.quantity?.message}><input className={inputClass} type="number" step="0.0001" {...form.register("quantity")} /></Field>
-        <Field label="Price" error={form.formState.errors.price?.message}><input className={inputClass} type="number" step="0.01" {...form.register("price")} /></Field>
-        <Field label="Amount" error={form.formState.errors.amount?.message}><input className={inputClass} type="number" step="0.01" {...form.register("amount")} /></Field>
-        <Field label="Fees" error={form.formState.errors.fees?.message}><input className={inputClass} type="number" step="0.01" {...form.register("fees")} /></Field>
-        <Field label="Currency" error={form.formState.errors.currency?.message}><input className={inputClass} {...form.register("currency")} /></Field>
-        <Field label="Executed Date" error={form.formState.errors.executedAt?.message}><input className={inputClass} type="date" {...form.register("executedAt")} /></Field>
-      </div>
-      <Field label="Search Market Asset">
-        <input className={inputClass} placeholder="AAPL, BTC, MSFT" onChange={(event) => onSearch(event.target.value)} />
-      </Field>
-      {marketAssets.length ? (
-        <div className="grid max-h-48 gap-2 overflow-y-auto rounded-2xl border border-white/8 bg-white/3 p-2">
-          {marketAssets.map((asset) => (
-            <button
-              key={asset.id}
-              type="button"
-              onClick={() => form.setValue("marketAssetId", asset.id)}
-              className={cn(
-                "rounded-xl border px-3 py-2 text-left text-sm transition hover:border-white/20",
-                selectedMarketAssetId === asset.id ? "border-[#b5b5f6]/50 bg-[#b5b5f6]/10" : "border-white/5"
-              )}
-            >
-              <span className="font-medium text-white">{asset.symbol}</span>
-              <span className="ml-2 text-xs text-neutral-500">{asset.name}</span>
-            </button>
+    <div className="space-y-5">
+      {/* Mode Picker */}
+      <div>
+        <p className="mb-2 text-[11px] font-medium uppercase tracking-wider text-neutral-500">Activity Type</p>
+        <div className="grid grid-cols-4 gap-2">
+          {(Object.keys(TX_MODE_META) as TxMode[]).map((m) => (
+            <ModeButton key={m} mode={m} active={mode === m} onClick={() => handleModeChange(m)} />
           ))}
         </div>
-      ) : null}
-      <PrimaryButton type="submit" disabled={pending || !accounts.length}>
-        {pending ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />} Save Transaction
-      </PrimaryButton>
-    </form>
+        {/* Mode description */}
+        <p className={cn("mt-2.5 text-xs", meta.color)}>{meta.description}</p>
+      </div>
+
+      <div className="border-t border-white/5" />
+
+      {/* ── EXPENSE FORM ─────────────────────────────────── */}
+      {meta.isExpense ? (
+        <form onSubmit={handleExpSubmit} className="space-y-4">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Category" error={expForm.formState.errors.category?.message}>
+              <select className={selectClass} {...expForm.register("category")}>
+                {expenseCategories.map((cat) => (
+                  <option key={cat} value={cat}>{title(cat)}</option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Title (optional)" error={expForm.formState.errors.title?.message}>
+              <input className={inputClass} placeholder="e.g. Grocery run" {...expForm.register("title")} />
+            </Field>
+            <Field label="Amount" error={expForm.formState.errors.amount?.message}>
+              <input className={inputClass} type="number" step="0.01" min="0.01" placeholder="0.00" {...expForm.register("amount")} />
+            </Field>
+            <Field label="Currency" error={expForm.formState.errors.currency?.message}>
+              <input className={inputClass} placeholder="USD" {...expForm.register("currency")} />
+            </Field>
+            <Field label="Date" error={expForm.formState.errors.occurredAt?.message}>
+              <input className={inputClass} type="date" {...expForm.register("occurredAt")} />
+            </Field>
+            <Field label="Debit Account (optional)" error={expForm.formState.errors.accountId?.message}>
+              <select className={selectClass} {...expForm.register("accountId")}>
+                <option value="">No account deduction</option>
+                {accounts.map((acc) => (
+                  <option key={acc.id} value={acc.id}>{acc.name} ({acc.currency})</option>
+                ))}
+              </select>
+            </Field>
+          </div>
+          <PrimaryButton type="submit" disabled={pendingExp}>
+            {pendingExp ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />} Record Expense
+          </PrimaryButton>
+        </form>
+      ) : (
+        /* ── TRANSACTION FORM ──────────────────────────────── */
+        <form onSubmit={handleTxSubmit} className="space-y-4">
+          <div className="grid gap-4 sm:grid-cols-2">
+            {/* Account selector — always shown */}
+            <Field label="Source Account" error={txForm.formState.errors.accountId?.message}>
+              <select
+                className={selectClass}
+                {...txForm.register("accountId")}
+                onChange={(e) => {
+                  txForm.setValue("accountId", e.target.value);
+                  const acc = accounts.find((a) => a.id === e.target.value);
+                  if (acc) txForm.setValue("currency", acc.currency);
+                }}
+              >
+                <option value="">Select account</option>
+                {accounts.map((acc) => (
+                  <option key={acc.id} value={acc.id}>
+                    {acc.name} — {acc.accountType} ({acc.currency})
+                  </option>
+                ))}
+              </select>
+            </Field>
+
+            {/* Destination account — only TRANSFER */}
+            {meta.needsDestAccount ? (
+              <Field label="Destination Account">
+                <select className={selectClass}>
+                  <option value="">Select destination</option>
+                  {accounts.filter((a) => a.id !== selectedAccountId).map((acc) => (
+                    <option key={acc.id} value={acc.id}>
+                      {acc.name} — {acc.accountType}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+            ) : null}
+
+            {/* Qty + Price — only BUY / SELL */}
+            {meta.needsQtyPrice ? (
+              <>
+                <Field label="Quantity" error={txForm.formState.errors.quantity?.message}>
+                  <input className={inputClass} type="number" step="0.0001" min="0" placeholder="0.0000" {...txForm.register("quantity")} />
+                </Field>
+                <Field label="Price per unit" error={txForm.formState.errors.price?.message}>
+                  <input className={inputClass} type="number" step="0.01" min="0" placeholder="0.00" {...txForm.register("price")} />
+                </Field>
+              </>
+            ) : null}
+
+            {/* Amount — DEPOSIT/WITHDRAWAL/TRANSFER/DIVIDEND/INTEREST */}
+            {meta.needsAmount ? (
+              <Field label="Amount" error={txForm.formState.errors.amount?.message}>
+                <input className={inputClass} type="number" step="0.01" min="0" placeholder="0.00" {...txForm.register("amount")} />
+              </Field>
+            ) : null}
+
+            {/* Fees — BUY / SELL only */}
+            {meta.needsFees ? (
+              <Field label="Fees / Commission" error={txForm.formState.errors.fees?.message}>
+                <input className={inputClass} type="number" step="0.01" min="0" placeholder="0.00" {...txForm.register("fees")} />
+              </Field>
+            ) : null}
+
+            <Field label="Currency" error={txForm.formState.errors.currency?.message}>
+              <input className={inputClass} placeholder="USD" {...txForm.register("currency")} />
+            </Field>
+            <Field label="Date" error={txForm.formState.errors.executedAt?.message}>
+              <input className={inputClass} type="date" {...txForm.register("executedAt")} />
+            </Field>
+          </div>
+
+          {/* Asset selector — BUY / SELL / DIVIDEND */}
+          {meta.needsAsset ? (
+            <div className="space-y-2">
+              <Field label={`Search ${accountType === "CRYPTO" ? "Crypto" : accountType === "BROKERAGE" ? "Stock / ETF" : "Market Asset"}`}>
+                <div className="relative">
+                  <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-600" />
+                  <input
+                    className={cn(inputClass, "pl-9")}
+                    placeholder={assetPlaceholder}
+                    onChange={(e) => onSearch(e.target.value)}
+                  />
+                </div>
+              </Field>
+              {marketAssets.length ? (
+                <div className="grid max-h-44 gap-1.5 overflow-y-auto rounded-xl border border-white/8 bg-white/2 p-2">
+                  {marketAssets.map((asset) => (
+                    <button
+                      key={asset.id}
+                      type="button"
+                      onClick={() => txForm.setValue("marketAssetId", asset.id)}
+                      className={cn(
+                        "flex items-center gap-3 rounded-lg border px-3 py-2 text-left text-sm transition hover:border-white/20",
+                        selectedMarketAssetId === asset.id
+                          ? "border-[#b5b5f6]/50 bg-[#b5b5f6]/8"
+                          : "border-white/5"
+                      )}
+                    >
+                      <span className="font-semibold text-white w-16 shrink-0">{asset.symbol}</span>
+                      <span className="text-xs text-neutral-400 truncate flex-1">{asset.name}</span>
+                      <span className="text-[10px] text-neutral-600 uppercase shrink-0">{asset.assetType}</span>
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+              {selectedMarketAssetId ? (
+                <div className="flex items-center justify-between rounded-xl border border-[#b5b5f6]/30 bg-[#b5b5f6]/8 px-3 py-2">
+                  <span className="text-xs text-[#b5b5f6]">
+                    ✓ Asset selected
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => txForm.setValue("marketAssetId", undefined)}
+                    className="text-[11px] text-neutral-500 hover:text-white"
+                  >
+                    Clear
+                  </button>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+
+          <PrimaryButton type="submit" disabled={pendingTx || !accounts.length}>
+            {pendingTx ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
+            {mode === "BUY" ? "Execute Buy" :
+             mode === "SELL" ? "Execute Sell" :
+             mode === "TRANSFER" ? "Execute Transfer" :
+             `Record ${TX_MODE_META[mode].label}`}
+          </PrimaryButton>
+        </form>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// TRANSACTIONS TABLE
+// ─────────────────────────────────────────────────────────────
+
+const TX_TYPE_COLORS: Record<string, string> = {
+  BUY:        "border-emerald-500/25 bg-emerald-500/10 text-emerald-300",
+  SELL:       "border-red-500/25 bg-red-500/10 text-red-300",
+  DEPOSIT:    "border-[#b5b5f6]/25 bg-[#b5b5f6]/10 text-[#b5b5f6]",
+  WITHDRAWAL: "border-orange-500/25 bg-orange-500/10 text-orange-300",
+  DIVIDEND:   "border-yellow-500/25 bg-yellow-500/10 text-yellow-300",
+  INTEREST:   "border-cyan-500/25 bg-cyan-500/10 text-cyan-300",
+  TRANSFER:   "border-sky-500/25 bg-sky-500/10 text-sky-300",
+  EXPENSE:    "border-[#f7bff4]/25 bg-[#f7bff4]/10 text-[#f7bff4]",
+};
+
+function TypeBadge({ type }: { type: string }) {
+  return (
+    <span className={cn("rounded-full border px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide", TX_TYPE_COLORS[type] ?? "border-white/8 bg-white/3 text-neutral-300")}>
+      {title(type)}
+    </span>
   );
 }
 
 function TransactionsTable({ transactions }: { transactions: Transaction[] }) {
   return (
     <div className="overflow-x-auto rounded-2xl border border-white/5 bg-neutral-950/20">
-      <table className="w-full min-w-215 border-collapse text-left text-sm">
+      <table className="w-full min-w-[860px] border-collapse text-left text-sm">
         <thead>
-          <tr className="border-b border-white/5 bg-white/1 text-xs uppercase tracking-wider text-neutral-500">
-            {["Date", "Type", "Asset", "Account", "Quantity", "Price", "Amount", "Fees"].map((head) => (
-              <th key={head} className="p-4 font-medium">{head}</th>
+          <tr className="border-b border-white/5 bg-white/1 text-[10px] uppercase tracking-wider text-neutral-500">
+            {["Date", "Type", "Asset / Description", "Account", "Qty", "Price", "Amount", "Fees"].map((head) => (
+              <th key={head} className="px-4 py-3 font-medium">{head}</th>
             ))}
           </tr>
         </thead>
         <tbody className="divide-y divide-white/5">
           {transactions.map((tx) => (
-            <tr key={tx.id} className="transition hover:bg-white/1">
-              <td className="p-4 text-xs text-neutral-500">{date(tx.executedAt)}</td>
-              <td className="p-4"><span className="rounded-full border border-white/8 bg-white/3 px-2 py-1 text-[11px] text-neutral-300">{title(tx.type)}</span></td>
-              <td className="p-4"><p className="font-medium text-white">{tx.marketAsset?.symbol ?? "Cash"}</p><p className="text-xs text-neutral-500">{tx.marketAsset?.name ?? "No linked asset"}</p></td>
-              <td className="p-4 text-xs text-neutral-400">{tx.account?.name ?? "Unknown"}</td>
-              <td className="p-4 font-mono text-xs text-neutral-300">{Number(tx.quantity ?? 0).toLocaleString()}</td>
-              <td className="p-4 font-mono text-xs text-neutral-300">{money(tx.price, tx.currency)}</td>
-              <td className="p-4 font-mono text-xs text-neutral-300">{money(tx.amount ?? Number(tx.quantity ?? 0) * Number(tx.price ?? 0), tx.currency)}</td>
-              <td className="p-4 font-mono text-xs text-neutral-500">{money(tx.fees, tx.currency)}</td>
+            <tr key={tx.id} className="group transition hover:bg-white/1">
+              <td className="px-4 py-3 text-xs text-neutral-500 whitespace-nowrap">{date(tx.executedAt)}</td>
+              <td className="px-4 py-3"><TypeBadge type={tx.type} /></td>
+              <td className="px-4 py-3">
+                <p className="font-medium text-white text-sm">{tx.marketAsset?.symbol ?? "Cash"}</p>
+                <p className="text-xs text-neutral-500 truncate max-w-36" title={tx.marketAsset?.name ?? ""}>{tx.marketAsset?.name ?? ""}</p>
+              </td>
+              <td className="px-4 py-3 text-xs text-neutral-400">{tx.account?.name ?? "—"}</td>
+              <td className="px-4 py-3 font-mono text-xs text-neutral-300">{tx.quantity ? Number(tx.quantity).toLocaleString(undefined, { maximumFractionDigits: 4 }) : "—"}</td>
+              <td className="px-4 py-3 font-mono text-xs text-neutral-300">{tx.price ? money(tx.price, tx.currency) : "—"}</td>
+              <td className="px-4 py-3 font-mono text-xs font-medium text-white">{money(tx.amount ?? (Number(tx.quantity ?? 0) * Number(tx.price ?? 0)), tx.currency)}</td>
+              <td className="px-4 py-3 font-mono text-xs text-neutral-500">{tx.fees ? money(tx.fees, tx.currency) : "—"}</td>
             </tr>
           ))}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+function ExpensesTable({ expenses }: { expenses: Expense[] }) {
+  return (
+    <div className="overflow-x-auto rounded-2xl border border-white/5 bg-neutral-950/20">
+      <table className="w-full min-w-[640px] border-collapse text-left text-sm">
+        <thead>
+          <tr className="border-b border-white/5 bg-white/1 text-[10px] uppercase tracking-wider text-neutral-500">
+            {["Date", "Category", "Title", "Account", "Amount"].map((head) => (
+              <th key={head} className="px-4 py-3 font-medium">{head}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-white/5">
+          {expenses.map((exp) => (
+            <tr key={exp.id} className="group transition hover:bg-white/1">
+              <td className="px-4 py-3 text-xs text-neutral-500 whitespace-nowrap">{date(exp.occurredAt)}</td>
+              <td className="px-4 py-3"><TypeBadge type={"EXPENSE"} /><span className="ml-2 text-[10px] text-neutral-400 uppercase tracking-wide">{title(exp.category)}</span></td>
+              <td className="px-4 py-3 text-sm text-neutral-300">{exp.title ?? <span className="text-neutral-600">—</span>}</td>
+              <td className="px-4 py-3 text-xs text-neutral-400">{exp.account?.name ?? <span className="text-neutral-600">—</span>}</td>
+              <td className="px-4 py-3 font-mono text-xs font-semibold text-[#f7bff4]">-{money(exp.amount, exp.currency)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// TRANSACTIONS PAGE
+// ─────────────────────────────────────────────────────────────
+
+type TxPageTab = "transactions" | "expenses" | "all";
+
+export function TransactionsPage() {
+  const { transactions, create } = useTransactions();
+  const { accounts } = useAccounts();
+  const { expenses, create: createExp } = useExpenses();
+
+  const [open, setOpen] = useState(false);
+  const [tab, setTab] = useState<TxPageTab>("transactions");
+  const [txFilter, setTxFilter] = useState<TransactionType | "ALL">("ALL");
+  const [expFilter, setExpFilter] = useState<ExpenseCategory | "ALL">("ALL");
+  const [search, setSearch] = useState("");
+  const [assetSearch, setAssetSearch] = useState("");
+  const { marketAssets } = useMarketAssets(assetSearch);
+
+  const filteredTx = useMemo(() =>
+    (transactions.data ?? []).filter((tx) => {
+      const matchesType = txFilter === "ALL" || tx.type === txFilter;
+      const hay = `${tx.marketAsset?.symbol ?? ""} ${tx.marketAsset?.name ?? ""} ${tx.account?.name ?? ""}`.toLowerCase();
+      return matchesType && hay.includes(search.toLowerCase());
+    }),
+    [transactions.data, txFilter, search]
+  );
+
+  const filteredExp = useMemo(() =>
+    (expenses.data ?? []).filter((exp) => {
+      const matchesCat = expFilter === "ALL" || exp.category === expFilter;
+      const hay = `${exp.title ?? ""} ${exp.account?.name ?? ""} ${exp.category}`.toLowerCase();
+      return matchesCat && hay.includes(search.toLowerCase());
+    }),
+    [expenses.data, expFilter, search]
+  );
+
+  const txTotal = useMemo(() => {
+    const buys = (transactions.data ?? []).filter((t) => t.type === "BUY").reduce((s, t) => s + Number(t.amount ?? 0), 0);
+    const sells = (transactions.data ?? []).filter((t) => t.type === "SELL").reduce((s, t) => s + Number(t.amount ?? 0), 0);
+    const expTotal = (expenses.data ?? []).reduce((s, e) => s + Number(e.amount), 0);
+    return { buys, sells, expTotal };
+  }, [transactions.data, expenses.data]);
+
+  const tabClass = (t: TxPageTab) => cn(
+    "px-4 py-2 text-xs font-semibold rounded-full transition-all",
+    tab === t
+      ? "bg-[#b5b5f6]/15 text-[#b5b5f6] border border-[#b5b5f6]/30"
+      : "text-neutral-500 hover:text-neutral-300 border border-transparent"
+  );
+
+  return (
+    <div className="space-y-8">
+      <PageHeader
+        title="Transactions"
+        description="Record and review all your trading activity, cash movements, and expenses in one place."
+        action={
+          <PrimaryButton onClick={() => setOpen(true)}>
+            <Plus size={14} /> New Entry
+          </PrimaryButton>
+        }
+      />
+
+      {/* Summary stat cards */}
+      <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
+        <StatCard
+          label="Trades Executed"
+          value={(transactions.data ?? []).filter((t) => t.type === "BUY" || t.type === "SELL").length}
+          icon={<ArrowLeftRight size={15} />}
+        />
+        <StatCard
+          label="Capital Deployed (Buys)"
+          value={money(txTotal.buys)}
+          color="text-emerald-400"
+          icon={<CircleDollarSign size={15} />}
+        />
+        <StatCard
+          label="Capital Returned (Sells)"
+          value={money(txTotal.sells)}
+          color="text-[#b5b5f6]"
+          icon={<CircleDollarSign size={15} />}
+        />
+        <StatCard
+          label="Total Expenses"
+          value={money(txTotal.expTotal)}
+          color="text-[#f7bff4]"
+          icon={<Wallet size={15} />}
+        />
+      </div>
+
+      {/* Tab + search + filter bar */}
+      <Panel>
+        <div className="flex flex-col gap-4">
+          <div className="flex items-center gap-2">
+            <button className={tabClass("transactions")} onClick={() => setTab("transactions")}>Transactions</button>
+            <button className={tabClass("expenses")} onClick={() => setTab("expenses")}>Expenses</button>
+            <button className={tabClass("all")} onClick={() => setTab("all")}>All Activity</button>
+          </div>
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+            <div className="relative flex-1">
+              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-600" />
+              <input className={cn(inputClass, "pl-9")} placeholder={`Search ${tab}…`} value={search} onChange={(e) => setSearch(e.target.value)} />
+            </div>
+            {tab !== "expenses" && (
+              <select className={cn(selectClass, "lg:w-48")} value={txFilter} onChange={(e) => setTxFilter(e.target.value as TransactionType | "ALL")}>
+                <option value="ALL">All Types</option>
+                {transactionTypes.map((t) => <option key={t} value={t}>{title(t)}</option>)}
+              </select>
+            )}
+            {tab !== "transactions" && (
+              <select className={cn(selectClass, "lg:w-48")} value={expFilter} onChange={(e) => setExpFilter(e.target.value as ExpenseCategory | "ALL")}>
+                <option value="ALL">All Categories</option>
+                {expenseCategories.map((c) => <option key={c} value={c}>{title(c)}</option>)}
+              </select>
+            )}
+          </div>
+        </div>
+      </Panel>
+
+      {/* Tables */}
+      {tab === "transactions" && (
+        transactions.isLoading
+          ? <SkeletonGrid count={2} />
+          : filteredTx.length
+            ? <TransactionsTable transactions={filteredTx} />
+            : <EmptyState icon={<ArrowLeftRight size={18} />} title="No transactions" description="Create your first trade, deposit, or transfer above." />
+      )}
+
+      {tab === "expenses" && (
+        expenses.isLoading
+          ? <SkeletonGrid count={2} />
+          : filteredExp.length
+            ? <ExpensesTable expenses={filteredExp} />
+            : <EmptyState icon={<Wallet size={18} />} title="No expenses recorded" description="Log an expense using the New Entry button above." />
+      )}
+
+      {tab === "all" && (
+        (transactions.isLoading || expenses.isLoading)
+          ? <SkeletonGrid count={3} />
+          : (
+            <div className="space-y-6">
+              {filteredTx.length ? (
+                <div>
+                  <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-neutral-500">Transactions ({filteredTx.length})</p>
+                  <TransactionsTable transactions={filteredTx} />
+                </div>
+              ) : null}
+              {filteredExp.length ? (
+                <div>
+                  <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-neutral-500">Expenses ({filteredExp.length})</p>
+                  <ExpensesTable expenses={filteredExp} />
+                </div>
+              ) : null}
+              {!filteredTx.length && !filteredExp.length && (
+                <EmptyState icon={<ArrowLeftRight size={18} />} title="No activity found" description="Adjust search filters or record your first entry." />
+              )}
+            </div>
+          )
+      )}
+
+      {/* Smart create modal */}
+      {open ? (
+        <Modal
+          title="New Activity Entry"
+          description="Select the activity type — fields adapt automatically based on your choice."
+          onClose={() => setOpen(false)}
+        >
+          <SmartTransactionForm
+            accounts={accounts.data ?? []}
+            marketAssets={marketAssets.data ?? []}
+            onSearch={setAssetSearch}
+            pendingTx={create.isPending}
+            pendingExp={createExp.isPending}
+            onSubmitTransaction={(data) =>
+              create.mutate(data, {
+                onSuccess: () => { toast.success("Transaction recorded"); setOpen(false); },
+                onError: (err: any) => toast.error(err?.response?.data?.message ?? "Failed to record transaction"),
+              })
+            }
+            onSubmitExpense={(data) =>
+              createExp.mutate(data, {
+                onSuccess: () => { toast.success("Expense recorded"); setOpen(false); },
+                onError: (err: any) => toast.error(err?.response?.data?.message ?? "Failed to record expense"),
+              })
+            }
+          />
+        </Modal>
+      ) : null}
     </div>
   );
 }
@@ -841,36 +1327,7 @@ export function AccountDetailPage({ accountId }: { accountId: string }) {
   );
 }
 
-export function TransactionsPage() {
-  const { transactions, create } = useTransactions();
-  const { accounts } = useAccounts();
-  const [open, setOpen] = useState(false);
-  const [filter, setFilter] = useState<TransactionType | "ALL">("ALL");
-  const [search, setSearch] = useState("");
-  const [assetSearch, setAssetSearch] = useState("");
-  const { marketAssets } = useMarketAssets(assetSearch);
-  const filtered = useMemo(() => (transactions.data ?? []).filter((tx) => {
-    const matchesType = filter === "ALL" || tx.type === filter;
-    const haystack = `${tx.marketAsset?.symbol ?? ""} ${tx.marketAsset?.name ?? ""} ${tx.account?.name ?? ""}`.toLowerCase();
-    return matchesType && haystack.includes(search.toLowerCase());
-  }), [transactions.data, filter, search]);
-  return (
-    <div className="space-y-8">
-      <PageHeader title="Transactions" description="Search, filter, paginate mentally for now, and record capital flow across accounts." action={<PrimaryButton onClick={() => setOpen(true)}><Plus size={14} /> Create Transaction</PrimaryButton>} />
-      <Panel>
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
-          <div className="relative flex-1"><Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-600" /><input className={cn(inputClass, "pl-9")} placeholder="Search transactions" value={search} onChange={(event) => setSearch(event.target.value)} /></div>
-          <select className={cn(selectClass, "lg:w-56")} value={filter} onChange={(event) => setFilter(event.target.value as TransactionType | "ALL")}>
-            <option value="ALL">All Types</option>
-            {transactionTypes.map((value) => <option key={value} value={value}>{title(value)}</option>)}
-          </select>
-        </div>
-      </Panel>
-      {transactions.isLoading ? <SkeletonGrid count={2} /> : filtered.length ? <TransactionsTable transactions={filtered} /> : <EmptyState icon={<ArrowLeftRight size={18} />} title="No matching transactions" description="Adjust search or create a new transaction." />}
-      {open ? <Modal title="Create Transaction" description="Record buy, sell, income, transfer, or cash activity." onClose={() => setOpen(false)}><TransactionForm accounts={accounts.data ?? []} marketAssets={marketAssets.data ?? []} onSearch={setAssetSearch} pending={create.isPending} onSubmit={(data) => create.mutate(data, { onSuccess: () => { toast.success("Transaction created"); setOpen(false); } })} /></Modal> : null}
-    </div>
-  );
-}
+
 
 export function MarketAssetsPage() {
   const [query, setQuery] = useState("A");

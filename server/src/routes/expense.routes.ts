@@ -13,3 +13,5 @@ router.post("/", protect, createExpense);
 router.get("/", protect, getUserExpenses);
 router.put("/:id", protect, updateExpense);
 router.delete("/:id", protect, deleteExpense);
+
+export default router;
