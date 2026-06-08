@@ -8,6 +8,7 @@ export interface Account {
   brokerName: string | null;
   accountType: AccountType;
   currency: string;
+  currentBalance: number | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -37,4 +38,13 @@ export const deleteAccount = async (
   accountId: string
 ): Promise<void> => {
   await api.delete(`/accounts/${accountId}`);
+};
+
+export const updateAccount = async (
+  api: AxiosInstance,
+  accountId: string,
+  data: { currentBalance?: number; name?: string; brokerName?: string }
+): Promise<Account> => {
+  const res = await api.patch(`/accounts/${accountId}`, data);
+  return res.data.account as Account;
 };

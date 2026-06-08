@@ -59,3 +59,26 @@ export const deleteAccountService = async (
 
   await prisma.account.delete({ where: { id: accountId } });
 };
+
+export const updateAccountService = async (
+  clerkUserId: string,
+  accountId: string,
+  data: { currentBalance?: number; name?: string; brokerName?: string }
+) => {
+  const user = await resolveUser(clerkUserId);
+
+  const account = await prisma.account.findFirst({
+    where: { id: accountId, userId: user.id },
+  });
+  if (!account)
+    throw new Error("Account not found or does not belong to user");
+
+  return prisma.account.update({
+    where: { id: accountId },
+    data: {
+      ...(data.name !== undefined && { name: data.name }),
+      ...(data.brokerName !== undefined && { brokerName: data.brokerName }),
+      ...(data.currentBalance !== undefined && { currentBalance: data.currentBalance }),
+    },
+  });
+};

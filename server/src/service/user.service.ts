@@ -41,3 +41,32 @@ export const getCurrentUserService = async (
     },
   });
 };
+
+export const updateUserService = async (
+  clerkUserId: string,
+  data: {
+    firstName?: string;
+    lastName?: string;
+    username?: string;
+    baseCurrency?: string;
+  }
+) => {
+  const user = await prisma.user.findUnique({ where: { clerkUserId } });
+  if (!user) throw new Error("User not found");
+
+  // Check username uniqueness if provided
+  if (data.username && data.username !== user.username) {
+    const existing = await prisma.user.findUnique({ where: { username: data.username } });
+    if (existing) throw new Error("Username already taken");
+  }
+
+  return prisma.user.update({
+    where: { clerkUserId },
+    data: {
+      ...(data.firstName !== undefined && { firstName: data.firstName }),
+      ...(data.lastName !== undefined && { lastName: data.lastName }),
+      ...(data.username !== undefined && { username: data.username }),
+      ...(data.baseCurrency !== undefined && { baseCurrency: data.baseCurrency.toUpperCase() }),
+    },
+  });
+};

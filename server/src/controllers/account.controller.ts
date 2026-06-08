@@ -4,6 +4,7 @@ import {
   createAccountService,
   getUserAccountsService,
   deleteAccountService,
+  updateAccountService,
 } from "../service/account.service.js";
 import { createAccountSchema } from "../validators/account.validator.js";
 
@@ -55,5 +56,28 @@ export const deleteAccount = async (req: Request, res: Response) => {
   } catch (error) {
     console.error(error);
     return res.status(500).json({ success: false, message: "Failed to delete account" });
+  }
+};
+
+export const updateAccount = async (req: Request, res: Response) => {
+  try {
+    const { userId } = getAuth(req);
+    if (!userId) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+
+    const accountId = req.params.accountId as string;
+    const { currentBalance, name, brokerName } = req.body;
+
+    const account = await updateAccountService(userId, accountId, {
+      currentBalance: currentBalance !== undefined ? Number(currentBalance) : undefined,
+      name,
+      brokerName,
+    });
+
+    return res.status(200).json({ success: true, account });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ success: false, message: "Failed to update account" });
   }
 };

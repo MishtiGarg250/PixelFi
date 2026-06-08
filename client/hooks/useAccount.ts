@@ -6,6 +6,7 @@ import {
   getAccounts,
   createAccount,
   deleteAccount,
+  updateAccount,
   type AccountType,
 } from "@/services/account.service";
 import { queryKeys } from "@/lib/queryKeys";
@@ -48,5 +49,21 @@ export function useAccounts() {
     },
   });
 
-  return { accounts, create, remove };
+  const update = useMutation({
+    mutationFn: async ({
+      accountId,
+      data,
+    }: {
+      accountId: string;
+      data: { currentBalance?: number; name?: string; brokerName?: string };
+    }) => {
+      const api = await getApi();
+      return updateAccount(api, accountId, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.accounts });
+    },
+  });
+
+  return { accounts, create, remove, update };
 }

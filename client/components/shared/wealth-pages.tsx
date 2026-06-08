@@ -12,16 +12,26 @@ import {
   ArrowLeftRight,
   ArrowRight,
   BarChart3,
+  Bell,
   BriefcaseBusiness,
+  CheckCircle2,
+  ChevronRight,
   CircleDollarSign,
+  Clock,
+  Copy,
   Database,
   FolderKanban,
+  Globe,
+  Key,
   LineChart,
+  Lock,
   Loader2,
   Pencil,
   Plus,
   Search,
+  Shield,
   Trash2,
+  User,
   Wallet,
   X,
 } from "lucide-react";
@@ -323,6 +333,7 @@ function AccountForm({ onSubmit, pending }: { onSubmit: (data: z.infer<typeof ac
 const portfolioSchema = z.object({
   name: z.string().min(2),
   description: z.string().optional(),
+  visibility: z.enum(["PRIVATE", "PUBLIC"]).default("PRIVATE"),
 });
 
 function PortfolioForm({
@@ -336,7 +347,7 @@ function PortfolioForm({
 }) {
   const form = useForm<z.infer<typeof portfolioSchema>>({
     resolver: zodResolver(portfolioSchema),
-    defaultValues: { name: initial?.name ?? "", description: initial?.description ?? "" },
+    defaultValues: { name: initial?.name ?? "", description: initial?.description ?? "", visibility: initial?.visibility ?? "PRIVATE" },
   });
   return (
     <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
@@ -345,6 +356,12 @@ function PortfolioForm({
       </Field>
       <Field label="Description" error={form.formState.errors.description?.message}>
         <textarea className={cn(inputClass, "h-24 py-3")} placeholder="Strategy or purpose" {...form.register("description")} />
+      </Field>
+      <Field label="Visibility">
+        <select className={selectClass} {...form.register("visibility")}>
+          <option value="PRIVATE">Private</option>
+          <option value="PUBLIC">Public</option>
+        </select>
       </Field>
       <PrimaryButton type="submit" disabled={pending}>
         {pending ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />} Save Portfolio
@@ -1266,35 +1283,187 @@ export function DashboardPage() {
 }
 
 export function AccountsPage() {
-  const { accounts, create, remove } = useAccounts();
+  const { accounts, create, remove, update } = useAccounts();
   const [createOpen, setCreateOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Account | null>(null);
+  const [editBalanceTarget, setEditBalanceTarget] = useState<Account | null>(null);
+  const [balanceInput, setBalanceInput] = useState("");
+
+  const totalBalance = useMemo(() => {
+    if (!accounts.data) return null;
+    const byType: Record<string, number> = {};
+    for (const acc of accounts.data) {
+      const bal = Number(acc.currentBalance ?? 0);
+      byType[acc.accountType] = (byType[acc.accountType] ?? 0) + bal;
+    }
+    return {
+      grand: accounts.data.reduce((s, a) => s + Number(a.currentBalance ?? 0), 0),
+      byType,
+    };
+  }, [accounts.data]);
+
+  function accountTypeIcon(type: string) {
+    if (type === "BANK") return <CircleDollarSign size={14} />;
+    if (type === "CRYPTO") return <Database size={14} />;
+    return <BriefcaseBusiness size={14} />;
+  }
+
+  function accountTypeColor(type: string) {
+    if (type === "BANK") return "text-emerald-400 bg-emerald-500/10 border-emerald-500/20";
+    if (type === "CRYPTO") return "text-orange-400 bg-orange-500/10 border-orange-500/20";
+    return "text-[#b5b5f6] bg-[#b5b5f6]/10 border-[#b5b5f6]/20";
+  }
 
   return (
     <div className="space-y-8">
-      <PageHeader title="Accounts" description="Manage brokerages, banks, and crypto venues used across your wealth stack." action={<PrimaryButton onClick={() => setCreateOpen(true)}><Plus size={14} /> Add Account</PrimaryButton>} />
+      <PageHeader
+        title="Accounts"
+        description="Manage brokerages, banks, and crypto venues used across your wealth stack."
+        action={<PrimaryButton onClick={() => setCreateOpen(true)}><Plus size={14} /> Add Account</PrimaryButton>}
+      />
+
+      {/* Summary Stats Row */}
+      {!accounts.isLoading && !accounts.isError && accounts.data && accounts.data.length > 0 && (
+        <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
+          <StatCard
+            label="Total Balance"
+            value={money(totalBalance?.grand ?? 0)}
+            icon={<Wallet size={14} />}
+            color="text-[#b5b5f6]"
+          />
+          <StatCard
+            label="Brokerage"
+            value={money(totalBalance?.byType["BROKERAGE"] ?? 0)}
+            icon={<BriefcaseBusiness size={14} />}
+          />
+          <StatCard
+            label="Bank"
+            value={money(totalBalance?.byType["BANK"] ?? 0)}
+            icon={<CircleDollarSign size={14} />}
+            color="text-emerald-400"
+          />
+          <StatCard
+            label="Crypto"
+            value={money(totalBalance?.byType["CRYPTO"] ?? 0)}
+            icon={<Database size={14} />}
+            color="text-orange-400"
+          />
+        </div>
+      )}
+
       {accounts.isError ? <ErrorState /> : accounts.isLoading ? <SkeletonGrid /> : accounts.data?.length ? (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {accounts.data.map((account) => (
-            <Panel key={account.id}>
-              <div className="flex items-start justify-between gap-3">
-                <div><h2 className="text-sm font-semibold text-white">{account.name}</h2><p className="mt-1 text-xs text-neutral-500">{account.brokerName || "No broker"}</p></div>
-                <span className="rounded-full border border-white/8 bg-white/3 px-2 py-1 text-[11px] text-neutral-300">{title(account.accountType)}</span>
-              </div>
-              <div className="mt-5 grid grid-cols-2 gap-3 text-xs text-neutral-500">
-                <span>Currency <b className="block pt-1 font-mono text-neutral-300">{account.currency}</b></span>
-                <span>Created <b className="block pt-1 font-normal text-neutral-300">{date(account.createdAt)}</b></span>
-              </div>
-              <div className="mt-5 flex justify-between">
-                <Link href={`/accounts/${account.id}`} className="inline-flex items-center gap-1 text-xs text-[#b5b5f6] hover:text-white">View <ArrowRight size={12} /></Link>
-                <GhostButton tone="danger" onClick={() => setDeleteTarget(account)}><Trash2 size={13} /> Delete</GhostButton>
-              </div>
-            </Panel>
-          ))}
+          {accounts.data.map((account) => {
+            const balance = Number(account.currentBalance ?? 0);
+            return (
+              <Panel key={account.id} className="flex flex-col justify-between gap-5 hover:border-white/10 transition duration-300">
+                {/* Header */}
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className={`flex h-9 w-9 items-center justify-center rounded-xl border ${accountTypeColor(account.accountType)}`}>
+                      {accountTypeIcon(account.accountType)}
+                    </div>
+                    <div>
+                      <h2 className="text-sm font-semibold text-white leading-tight">{account.name}</h2>
+                      <p className="text-xs text-neutral-500 mt-0.5">{account.brokerName || "No broker"}</p>
+                    </div>
+                  </div>
+                  <span className={`rounded-full border px-2 py-1 text-[10px] font-semibold uppercase tracking-wide ${accountTypeColor(account.accountType)}`}>
+                    {title(account.accountType)}
+                  </span>
+                </div>
+
+                {/* Balance */}
+                <div className="rounded-xl bg-white/3 border border-white/5 px-4 py-3">
+                  <p className="text-[11px] text-neutral-500 uppercase tracking-wider font-medium">Current Balance</p>
+                  <p className="mt-1 text-2xl font-bold tracking-tight text-white font-mono">
+                    {money(balance, account.currency)}
+                  </p>
+                  <p className="mt-0.5 text-[11px] text-neutral-600">{account.currency}</p>
+                </div>
+
+                {/* Meta */}
+                <div className="grid grid-cols-2 gap-3 text-xs text-neutral-500">
+                  <span>Created <b className="block pt-1 font-normal text-neutral-300">{date(account.createdAt)}</b></span>
+                  <span>Updated <b className="block pt-1 font-normal text-neutral-300">{date(account.updatedAt)}</b></span>
+                </div>
+
+                {/* Actions */}
+                <div className="flex items-center justify-between border-t border-white/5 pt-4">
+                  <Link href={`/accounts/${account.id}`} className="inline-flex items-center gap-1 text-xs text-[#b5b5f6] hover:text-white transition">
+                    View Details <ArrowRight size={12} />
+                  </Link>
+                  <div className="flex gap-2">
+                    <GhostButton onClick={() => { setEditBalanceTarget(account); setBalanceInput(String(balance)); }}>
+                      <Pencil size={13} /> Edit
+                    </GhostButton>
+                    <GhostButton tone="danger" onClick={() => setDeleteTarget(account)}>
+                      <Trash2 size={13} /> Delete
+                    </GhostButton>
+                  </div>
+                </div>
+              </Panel>
+            );
+          })}
         </div>
       ) : <EmptyState icon={<Wallet size={18} />} title="No accounts" description="Add your first account to start organizing transactions and balances." />}
-      {createOpen ? <Modal title="Add Account" description="Create a new financial account." onClose={() => setCreateOpen(false)}><AccountForm pending={create.isPending} onSubmit={(data) => create.mutate(data, { onSuccess: () => { toast.success("Account created"); setCreateOpen(false); } })} /></Modal> : null}
-      {deleteTarget ? <Modal title="Delete Account" description={`Delete ${deleteTarget.name}? This cannot be undone.`} onClose={() => setDeleteTarget(null)}><GhostButton tone="danger" disabled={remove.isPending} onClick={() => remove.mutate(deleteTarget.id, { onSuccess: () => { toast.success("Account deleted"); setDeleteTarget(null); } })}>{remove.isPending ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />} Delete Account</GhostButton></Modal> : null}
+
+      {/* Create Modal */}
+      {createOpen ? (
+        <Modal title="Add Account" description="Create a new financial account." onClose={() => setCreateOpen(false)}>
+          <AccountForm pending={create.isPending} onSubmit={(data) => create.mutate(data, { onSuccess: () => { toast.success("Account created"); setCreateOpen(false); } })} />
+        </Modal>
+      ) : null}
+
+      {/* Delete Modal */}
+      {deleteTarget ? (
+        <Modal title="Delete Account" description={`Delete ${deleteTarget.name}? This cannot be undone.`} onClose={() => setDeleteTarget(null)}>
+          <GhostButton tone="danger" disabled={remove.isPending} onClick={() => remove.mutate(deleteTarget.id, { onSuccess: () => { toast.success("Account deleted"); setDeleteTarget(null); } })}>
+            {remove.isPending ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />} Delete Account
+          </GhostButton>
+        </Modal>
+      ) : null}
+
+      {/* Edit Balance Modal */}
+      {editBalanceTarget ? (
+        <Modal
+          title={`Edit Balance — ${editBalanceTarget.name}`}
+          description={`Update the current balance for this ${title(editBalanceTarget.accountType)} account (${editBalanceTarget.currency}).`}
+          onClose={() => setEditBalanceTarget(null)}
+        >
+          <div className="space-y-4">
+            <Field label={`Balance (${editBalanceTarget.currency})`}>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                className={inputClass}
+                value={balanceInput}
+                onChange={(e) => setBalanceInput(e.target.value)}
+                placeholder="0.00"
+              />
+            </Field>
+            <PrimaryButton
+              type="button"
+              disabled={update.isPending}
+              onClick={() =>
+                update.mutate(
+                  { accountId: editBalanceTarget.id, data: { currentBalance: Number(balanceInput) } },
+                  {
+                    onSuccess: () => {
+                      toast.success("Balance updated");
+                      setEditBalanceTarget(null);
+                    },
+                  }
+                )
+              }
+            >
+              {update.isPending ? <Loader2 size={14} className="animate-spin" /> : null}
+              Save Balance
+            </PrimaryButton>
+          </div>
+        </Modal>
+      ) : null}
     </div>
   );
 }
@@ -1303,30 +1472,96 @@ export function AccountDetailPage({ accountId }: { accountId: string }) {
   const { accounts } = useAccounts();
   const { transactions } = useTransactions(accountId);
   const account = accounts.data?.find((item) => item.id === accountId);
-  const counts = useMemo(() => {
+
+  const stats = useMemo(() => {
     const list = transactions.data ?? [];
+    const totalVolume = list.reduce((s, t) => s + Number(t.amount ?? 0), 0);
+    const totalFees = list.reduce((s, t) => s + Number(t.fees ?? 0), 0);
+    const deposits = list.filter((t) => t.type === "DEPOSIT");
+    const withdrawals = list.filter((t) => t.type === "WITHDRAWAL");
+    const buys = list.filter((t) => t.type === "BUY");
+    const sells = list.filter((t) => t.type === "SELL");
     return {
-      buy: list.filter((item) => item.type === "BUY").length,
-      sell: list.filter((item) => item.type === "SELL").length,
-      deposits: list.filter((item) => item.type === "DEPOSIT").length,
-      withdrawals: list.filter((item) => item.type === "WITHDRAWAL").length,
+      txCount: list.length,
+      totalVolume,
+      totalFees,
+      depositsTotal: deposits.reduce((s, t) => s + Number(t.amount ?? 0), 0),
+      withdrawalsTotal: withdrawals.reduce((s, t) => s + Number(t.amount ?? 0), 0),
+      buys: buys.length,
+      sells: sells.length,
     };
   }, [transactions.data]);
+
+  function accountTypeIcon(type: string) {
+    if (type === "BANK") return <CircleDollarSign size={16} />;
+    if (type === "CRYPTO") return <Database size={16} />;
+    return <BriefcaseBusiness size={16} />;
+  }
+
+  function accountTypeColor(type: string) {
+    if (type === "BANK") return "text-emerald-400 bg-emerald-500/10 border-emerald-500/20";
+    if (type === "CRYPTO") return "text-orange-400 bg-orange-500/10 border-orange-500/20";
+    return "text-[#b5b5f6] bg-[#b5b5f6]/10 border-[#b5b5f6]/20";
+  }
+
   return (
     <div className="space-y-8">
       <Link href="/accounts" className="inline-flex items-center gap-2 text-xs text-neutral-500 hover:text-white"><ArrowLeft size={13} /> Accounts</Link>
-      <PageHeader title={account?.name ?? "Account Details"} description={account ? `${account.brokerName ?? "No broker"} · ${title(account.accountType)} · ${account.currency}` : "Review account transaction history and statistics."} />
-      <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
-        <StatCard label="Buy Transactions" value={counts.buy} />
-        <StatCard label="Sell Transactions" value={counts.sell} />
-        <StatCard label="Deposits" value={counts.deposits} />
-        <StatCard label="Withdrawals" value={counts.withdrawals} />
+
+      {/* Hero Header */}
+      <div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-4">
+          {account && (
+            <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border ${accountTypeColor(account.accountType)}`}>
+              {accountTypeIcon(account.accountType)}
+            </div>
+          )}
+          <div>
+            <h1 className="text-3xl font-semibold tracking-tight text-white">{account?.name ?? "Account Details"}</h1>
+            {account && (
+              <p className="mt-1 text-sm text-neutral-400">
+                {account.brokerName ?? "No broker"} · <span className={`font-medium ${accountTypeColor(account.accountType).split(" ")[0]}`}>{title(account.accountType)}</span> · {account.currency}
+              </p>
+            )}
+          </div>
+        </div>
+
+        {/* Balance hero badge */}
+        {account && (
+          <div className="rounded-2xl border border-white/8 bg-white/3 px-6 py-4 text-right">
+            <p className="text-[11px] text-neutral-500 uppercase tracking-wider font-medium">Current Balance</p>
+            <p className="mt-1 text-3xl font-bold tracking-tight text-white font-mono">
+              {money(Number(account.currentBalance ?? 0), account.currency)}
+            </p>
+            <p className="mt-0.5 text-xs text-neutral-600">{account.currency} · as of {date(account.updatedAt)}</p>
+          </div>
+        )}
       </div>
-      {transactions.isLoading ? <SkeletonGrid count={2} /> : transactions.data?.length ? <TransactionsTable transactions={transactions.data} /> : <EmptyState icon={<ArrowLeftRight size={18} />} title="No transaction history" description="Activity for this account will appear here." />}
+
+      {/* Key Stats */}
+      <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
+        <StatCard label="Total Transactions" value={stats.txCount} icon={<ArrowLeftRight size={14} />} />
+        <StatCard label="Total Deposits" value={money(stats.depositsTotal, account?.currency)} color="text-emerald-400" />
+        <StatCard label="Total Withdrawals" value={money(stats.withdrawalsTotal, account?.currency)} color="text-red-400" />
+        <StatCard label="Fees Paid" value={money(stats.totalFees, account?.currency)} color="text-neutral-400" />
+      </div>
+
+      {/* Trade stats (only meaningful if BROKERAGE / CRYPTO) */}
+      {account && account.accountType !== "BANK" && (
+        <div className="grid grid-cols-2 gap-4">
+          <StatCard label="Buy Orders" value={stats.buys} color="text-emerald-400" />
+          <StatCard label="Sell Orders" value={stats.sells} color="text-red-400" />
+        </div>
+      )}
+
+      {/* Transaction history */}
+      <div className="space-y-3">
+        <h2 className="text-base font-semibold text-white">Transaction History</h2>
+        {transactions.isLoading ? <SkeletonGrid count={2} /> : transactions.data?.length ? <TransactionsTable transactions={transactions.data} /> : <EmptyState icon={<ArrowLeftRight size={18} />} title="No transaction history" description="Activity for this account will appear here." />}
+      </div>
     </div>
   );
 }
-
 
 
 export function MarketAssetsPage() {
@@ -1619,22 +1854,143 @@ export function PortfoliosPage() {
   const { portfolios, create, update, remove } = usePortfolios();
   const [createOpen, setCreateOpen] = useState(false);
   const [edit, setEdit] = useState<Portfolio | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Portfolio | null>(null);
+
+  const summary = useMemo(() => {
+    const list = portfolios.data ?? [];
+    const totalCustom = list.reduce((s, p) => s + (p._count?.customAssets ?? 0), 0);
+    const totalMarket = list.reduce((s, p) => s + (p._count?.marketAssets ?? 0), 0);
+    return { count: list.length, totalCustom, totalMarket };
+  }, [portfolios.data]);
+
+  function visibilityStyle(v: string) {
+    return v === "PUBLIC"
+      ? "text-emerald-400 bg-emerald-500/10 border-emerald-500/20"
+      : "text-neutral-400 bg-white/4 border-white/10";
+  }
+
   return (
     <div className="space-y-8">
-      <PageHeader title="Portfolios" description="Create and manage discrete allocation structures for your assets and accounts." action={<PrimaryButton onClick={() => setCreateOpen(true)}><Plus size={14} /> New Portfolio</PrimaryButton>} />
-      {portfolios.isLoading ? <SkeletonGrid /> : portfolios.data?.length ? (
+      <PageHeader
+        title="Portfolios"
+        description="Create and manage discrete allocation structures for your assets and accounts."
+        action={<PrimaryButton onClick={() => setCreateOpen(true)}><Plus size={14} /> New Portfolio</PrimaryButton>}
+      />
+
+      {/* Summary stats */}
+      {!portfolios.isLoading && !portfolios.isError && summary.count > 0 && (
+        <div className="grid grid-cols-3 gap-4">
+          <StatCard label="Total Portfolios" value={summary.count} icon={<FolderKanban size={14} />} color="text-[#b5b5f6]" />
+          <StatCard label="Market Holdings" value={summary.totalMarket} icon={<LineChart size={14} />} />
+          <StatCard label="Custom Assets" value={summary.totalCustom} icon={<Database size={14} />} />
+        </div>
+      )}
+
+      {portfolios.isLoading ? <SkeletonGrid /> : portfolios.isError ? <ErrorState /> : portfolios.data?.length ? (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {portfolios.data.map((portfolio) => (
-            <Panel key={portfolio.id}>
-              <div className="flex items-start justify-between gap-3"><div><h2 className="text-sm font-semibold text-white">{portfolio.name}</h2><p className="mt-1 line-clamp-2 text-xs text-neutral-500">{portfolio.description || "No description"}</p></div><span className="rounded-full border border-white/8 bg-white/3 px-2 py-1 text-[11px] text-neutral-300">{title(portfolio.visibility)}</span></div>
-              <div className="mt-5 grid grid-cols-3 gap-3 text-xs text-neutral-500"><span>Custom Assets <b className="block pt-1 text-neutral-300">{portfolio._count?.customAssets ?? 0}</b></span><span>Market Assets <b className="block pt-1 text-neutral-300">{portfolio._count?.marketAssets ?? 0}</b></span><span>Created <b className="block pt-1 font-normal text-neutral-300">{date(portfolio.createdAt)}</b></span></div>
-              <div className="mt-5 flex flex-wrap gap-2"><GhostButton onClick={() => router.push(`/portfolios/${portfolio.id}`)}>View <ArrowRight size={13} /></GhostButton><GhostButton onClick={() => setEdit(portfolio)}><Pencil size={13} /> Edit</GhostButton><GhostButton tone="danger" onClick={() => remove.mutate(portfolio.id, { onSuccess: () => toast.success("Portfolio deleted") })}><Trash2 size={13} /> Delete</GhostButton></div>
-            </Panel>
-          ))}
+          {portfolios.data.map((portfolio) => {
+            const totalAssets = (portfolio._count?.customAssets ?? 0) + (portfolio._count?.marketAssets ?? 0);
+            return (
+              <Panel key={portfolio.id} className="flex flex-col justify-between gap-5 hover:border-white/10 transition duration-300">
+                {/* Header */}
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-[#b5b5f6]/20 bg-[#b5b5f6]/8 text-[#b5b5f6]">
+                      <FolderKanban size={14} />
+                    </div>
+                    <div>
+                      <h2 className="text-sm font-semibold text-white leading-tight">{portfolio.name}</h2>
+                      <p className="text-xs text-neutral-500 mt-0.5 line-clamp-1">{portfolio.description || "No description"}</p>
+                    </div>
+                  </div>
+                  <span className={`shrink-0 rounded-full border px-2 py-1 text-[10px] font-semibold uppercase tracking-wide ${visibilityStyle(portfolio.visibility)}`}>
+                    {title(portfolio.visibility)}
+                  </span>
+                </div>
+
+                {/* Asset counts inset */}
+                <div className="grid grid-cols-3 gap-2 rounded-xl border border-white/5 bg-white/2 px-4 py-3 text-xs">
+                  <div>
+                    <p className="text-neutral-500">Total</p>
+                    <p className="mt-1 font-semibold text-white">{totalAssets}</p>
+                  </div>
+                  <div>
+                    <p className="text-neutral-500">Market</p>
+                    <p className="mt-1 font-semibold text-[#b5b5f6]">{portfolio._count?.marketAssets ?? 0}</p>
+                  </div>
+                  <div>
+                    <p className="text-neutral-500">Custom</p>
+                    <p className="mt-1 font-semibold text-[#f7bff4]">{portfolio._count?.customAssets ?? 0}</p>
+                  </div>
+                </div>
+
+                {/* Dates */}
+                <div className="grid grid-cols-2 gap-3 text-xs text-neutral-500">
+                  <span>Created <b className="block pt-1 font-normal text-neutral-300">{date(portfolio.createdAt)}</b></span>
+                  <span>Updated <b className="block pt-1 font-normal text-neutral-300">{date(portfolio.updatedAt)}</b></span>
+                </div>
+
+                {/* Actions */}
+                <div className="flex items-center justify-between border-t border-white/5 pt-4">
+                  <GhostButton onClick={() => router.push(`/portfolios/${portfolio.id}`)}>
+                    View Details <ArrowRight size={13} />
+                  </GhostButton>
+                  <div className="flex gap-2">
+                    <GhostButton onClick={() => setEdit(portfolio)}><Pencil size={13} /> Edit</GhostButton>
+                    <GhostButton tone="danger" onClick={() => setDeleteTarget(portfolio)}><Trash2 size={13} /> Delete</GhostButton>
+                  </div>
+                </div>
+              </Panel>
+            );
+          })}
         </div>
       ) : <EmptyState icon={<FolderKanban size={18} />} title="No portfolios" description="Create your first portfolio to organize accounts and assets." />}
-      {createOpen ? <Modal title="Create Portfolio" onClose={() => setCreateOpen(false)}><PortfolioForm pending={create.isPending} onSubmit={(data) => create.mutate(data, { onSuccess: () => { toast.success("Portfolio created"); setCreateOpen(false); } })} /></Modal> : null}
-      {edit ? <Modal title="Edit Portfolio" onClose={() => setEdit(null)}><PortfolioForm initial={edit} pending={update.isPending} onSubmit={(data) => update.mutate({ portfolioId: edit.id, data: { name: data.name, description: data.description || null } }, { onSuccess: () => { toast.success("Portfolio updated"); setEdit(null); } })} /></Modal> : null}
+
+      {/* Create Modal */}
+      {createOpen ? (
+        <Modal title="Create Portfolio" onClose={() => setCreateOpen(false)}>
+          <PortfolioForm
+            pending={create.isPending}
+            onSubmit={(data) => create.mutate({ name: data.name, description: data.description }, {
+              onSuccess: () => { toast.success("Portfolio created"); setCreateOpen(false); }
+            })}
+          />
+        </Modal>
+      ) : null}
+
+      {/* Edit Modal */}
+      {edit ? (
+        <Modal title="Edit Portfolio" onClose={() => setEdit(null)}>
+          <PortfolioForm
+            initial={edit}
+            pending={update.isPending}
+            onSubmit={(data) => update.mutate({
+              portfolioId: edit.id,
+              data: { name: data.name, description: data.description || null, visibility: data.visibility }
+            }, { onSuccess: () => { toast.success("Portfolio updated"); setEdit(null); } })}
+          />
+        </Modal>
+      ) : null}
+
+      {/* Delete Confirm Modal */}
+      {deleteTarget ? (
+        <Modal
+          title="Delete Portfolio"
+          description={`Delete "${deleteTarget.name}"? All asset associations will be removed. This cannot be undone.`}
+          onClose={() => setDeleteTarget(null)}
+        >
+          <GhostButton
+            tone="danger"
+            disabled={remove.isPending}
+            onClick={() => remove.mutate(deleteTarget.id, {
+              onSuccess: () => { toast.success("Portfolio deleted"); setDeleteTarget(null); }
+            })}
+          >
+            {remove.isPending ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+            Delete Portfolio
+          </GhostButton>
+        </Modal>
+      ) : null}
     </div>
   );
 }
@@ -1642,25 +1998,216 @@ export function PortfoliosPage() {
 export function PortfolioDetailPage({ portfolioId }: { portfolioId: string }) {
   const router = useRouter();
   const portfolio = usePortfolio(portfolioId);
-  const { customAssets } = useCustomAssets(portfolioId);
+  const { portfolios, update } = usePortfolios();
   const allocation = useAllocation();
-  const marketAssetEntries = portfolio.data?.marketAssets ?? [];
-  const assetCount = (customAssets.data?.length ?? 0) + (portfolio.data?._count?.marketAssets ?? 0);
-  const customAssetsValue = (customAssets.data ?? []).reduce((sum, item) => sum + item.currentValue, 0);
-  const marketAssetsValue = marketAssetEntries.reduce((sum, entry) => sum + Number(entry.userMarketAsset.quantity) * Number(entry.userMarketAsset.averageCost), 0);
-  const portfolioValue = customAssetsValue + marketAssetsValue;
+  const [editOpen, setEditOpen] = useState(false);
+
+  const data = portfolio.data;
+  const marketAssetEntries = data?.marketAssets ?? [];
+  const customAssetList = data?.customAssets ?? [];
+
+  const marketAssetsValue = marketAssetEntries.reduce(
+    (sum, entry) => sum + Number(entry.userMarketAsset.quantity) * Number(entry.userMarketAsset.averageCost), 0
+  );
+  const customAssetsValue = customAssetList.reduce((sum, a) => sum + Number(a.currentValue), 0);
+  const totalValue = data?.totalValue ?? (marketAssetsValue + customAssetsValue);
+
+  const assetTypeBreakdown = useMemo(() => {
+    const counts: Record<string, number> = {};
+    const values: Record<string, number> = {};
+    for (const entry of marketAssetEntries) {
+      const type = entry.userMarketAsset.marketAsset.assetType;
+      counts[type] = (counts[type] ?? 0) + 1;
+      values[type] = (values[type] ?? 0) + Number(entry.userMarketAsset.quantity) * Number(entry.userMarketAsset.averageCost);
+    }
+    return { counts, values };
+  }, [marketAssetEntries]);
+
+  function visibilityStyle(v: string) {
+    return v === "PUBLIC"
+      ? "text-emerald-400 bg-emerald-500/10 border-emerald-500/20"
+      : "text-neutral-400 bg-white/4 border-white/10";
+  }
+
   if (portfolio.isLoading) return <SkeletonGrid count={4} />;
-  if (portfolio.isError || !portfolio.data) return <ErrorState label="Portfolio not found." />;
+  if (portfolio.isError || !data) return <ErrorState label="Portfolio not found." />;
+
+  const portfolioListEntry = portfolios.data?.find((p) => p.id === portfolioId);
+
   return (
     <div className="space-y-8">
-      <button onClick={() => router.push("/portfolios")} className="inline-flex items-center gap-2 text-xs text-neutral-500 hover:text-white"><ArrowLeft size={13} /> Portfolios</button>
-      <PageHeader title={portfolio.data.name} description={portfolio.data.description || "No description provided."} />
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-3"><StatCard label="Asset Count" value={assetCount} /><StatCard label="Portfolio Value" value={money(portfolioValue)} color="text-[#b5b5f6]" /><StatCard label="Created" value={date(portfolio.data.createdAt)} /></div>
-      <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
-        <Panel><h2 className="mb-4 text-sm font-semibold text-white">Custom Assets</h2>{customAssets.data?.length ? <div className="space-y-3">{customAssets.data.map((asset) => <div key={asset.id} className="flex justify-between rounded-xl border border-white/5 bg-white/2 p-3"><span className="text-sm text-white">{asset.name}</span><span className="text-sm text-[#b5b5f6]">{money(asset.currentValue, asset.currency)}</span></div>)}</div> : <EmptyState icon={<Database size={18} />} title="No custom assets" description="Assigned custom assets will appear here." />}</Panel>
-        <Panel><h2 className="mb-4 text-sm font-semibold text-white">Allocation Chart</h2><div className="h-72">{allocation.data?.length ? <ResponsiveContainer><PieChart><Pie data={allocation.data} dataKey="currentValue" nameKey="symbol" innerRadius={58} outerRadius={95}>{allocation.data.map((_, index) => <Cell key={index} fill={accent[index % accent.length]} />)}</Pie><Tooltip contentStyle={{ background: "#0a0a0a", border: "1px solid rgba(255,255,255,.08)", borderRadius: 12 }} /></PieChart></ResponsiveContainer> : <EmptyState icon={<BarChart3 size={18} />} title="Allocation unavailable" description="Allocation appears when analytics data is available." />}</div></Panel>
+      <button onClick={() => router.push("/portfolios")} className="inline-flex items-center gap-2 text-xs text-neutral-500 hover:text-white">
+        <ArrowLeft size={13} /> Portfolios
+      </button>
+
+      {/* Hero Header */}
+      <div className="flex flex-col gap-6 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex items-center gap-4">
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-[#b5b5f6]/20 bg-[#b5b5f6]/8 text-[#b5b5f6]">
+            <FolderKanban size={18} />
+          </div>
+          <div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <h1 className="text-3xl font-semibold tracking-tight text-white">{data.name}</h1>
+              <span className={`rounded-full border px-2 py-1 text-[10px] font-semibold uppercase tracking-wide ${visibilityStyle(data.visibility)}`}>
+                {title(data.visibility)}
+              </span>
+            </div>
+            <p className="mt-1 text-sm text-neutral-400 max-w-xl">{data.description || "No description provided."}</p>
+            <p className="mt-1 text-xs text-neutral-600">Created {date(data.createdAt)} · Updated {date(data.updatedAt)}</p>
+          </div>
+        </div>
+
+        {/* Value hero badge + edit */}
+        <div className="flex flex-col items-end gap-3 shrink-0">
+          <div className="rounded-2xl border border-white/8 bg-white/3 px-6 py-4 text-right">
+            <p className="text-[11px] text-neutral-500 uppercase tracking-wider font-medium">Portfolio Value</p>
+            <p className="mt-1 text-3xl font-bold tracking-tight text-[#b5b5f6] font-mono">{money(totalValue)}</p>
+            <p className="mt-0.5 text-xs text-neutral-600">
+              {marketAssetEntries.length} market · {customAssetList.length} custom assets
+            </p>
+          </div>
+          <GhostButton onClick={() => setEditOpen(true)}><Pencil size={13} /> Edit Portfolio</GhostButton>
+        </div>
       </div>
-      <Panel><h2 className="mb-4 text-sm font-semibold text-white">Market Assets</h2>{marketAssetEntries.length ? <div className="space-y-3">{marketAssetEntries.map((entry) => { const ua = entry.userMarketAsset; const asset = ua.marketAsset; const qty = Number(ua.quantity); const avgCost = Number(ua.averageCost); const totalInvested = qty * avgCost; return (<div key={entry.userMarketAssetId} className="flex items-center justify-between rounded-xl border border-white/5 bg-white/2 p-4 transition hover:border-white/10"><div className="flex items-center gap-3"><div><p className="text-sm font-semibold text-white">{asset.symbol}</p><p className="text-xs text-neutral-500">{asset.name}</p></div><span className="rounded-full border border-white/8 bg-white/3 px-2 py-0.5 text-[10px] uppercase text-neutral-400">{title(asset.assetType)}</span></div><div className="text-right"><p className="text-sm font-semibold text-[#b5b5f6]">{money(totalInvested, asset.currency)}</p><p className="text-[11px] text-neutral-500">{qty.toLocaleString(undefined, { maximumFractionDigits: 4 })} shares @ {money(avgCost, asset.currency)}</p></div></div>); })}</div> : <EmptyState icon={<LineChart size={18} />} title="No market assets" description="Assign market assets to this portfolio from the Market Assets page." />}</Panel>
+
+      {/* Key Stats */}
+      <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
+        <StatCard label="Market Assets" value={marketAssetEntries.length} icon={<LineChart size={14} />} color="text-[#b5b5f6]" />
+        <StatCard label="Custom Assets" value={customAssetList.length} icon={<Database size={14} />} color="text-[#f7bff4]" />
+        <StatCard label="Market Value" value={money(marketAssetsValue)} color="text-[#b5b5f6]" />
+        <StatCard label="Custom Value" value={money(customAssetsValue)} color="text-[#f7bff4]" />
+      </div>
+
+      {/* Asset type breakdown — only if market assets exist */}
+      {marketAssetEntries.length > 0 && Object.keys(assetTypeBreakdown.counts).length > 0 && (
+        <Panel>
+          <h2 className="mb-4 text-sm font-semibold text-white">Holdings by Asset Type</h2>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-5">
+            {Object.entries(assetTypeBreakdown.counts).map(([type, count]) => (
+              <div key={type} className="rounded-xl border border-white/5 bg-white/2 px-3 py-3 text-center">
+                <p className="text-[10px] text-neutral-500 uppercase tracking-wider">{title(type)}</p>
+                <p className="mt-1 text-lg font-bold text-white">{count}</p>
+                <p className="text-[11px] text-[#b5b5f6] font-mono">{money(assetTypeBreakdown.values[type] ?? 0)}</p>
+              </div>
+            ))}
+          </div>
+        </Panel>
+      )}
+
+      {/* Two-column: Custom Assets + Allocation */}
+      <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
+        <Panel>
+          <h2 className="mb-4 text-sm font-semibold text-white">Custom Assets</h2>
+          {customAssetList.length ? (
+            <div className="space-y-3">
+              {customAssetList.map((asset) => (
+                <div key={asset.id} className="flex items-center justify-between rounded-xl border border-white/5 bg-white/2 p-4 transition hover:border-white/10">
+                  <div>
+                    <p className="text-sm font-semibold text-white">{asset.name}</p>
+                    <div className="mt-1 flex items-center gap-2">
+                      <span className="rounded-full border border-white/8 bg-white/3 px-2 py-0.5 text-[10px] uppercase text-neutral-400">{title(asset.category)}</span>
+                      {asset.description && <p className="text-xs text-neutral-500 truncate max-w-36" title={asset.description}>{asset.description}</p>}
+                    </div>
+                    {asset.purchasePrice && (
+                      <p className="mt-1 text-xs text-neutral-600">Cost basis: {money(asset.purchasePrice, asset.currency)}</p>
+                    )}
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm font-semibold text-[#f7bff4]">{money(asset.currentValue, asset.currency)}</p>
+                    {asset.purchasePrice && (
+                      <p className={`text-[11px] ${Number(asset.currentValue) >= Number(asset.purchasePrice) ? "text-emerald-400" : "text-red-400"}`}>
+                        {Number(asset.currentValue) >= Number(asset.purchasePrice) ? "+" : ""}
+                        {money(Number(asset.currentValue) - Number(asset.purchasePrice), asset.currency)}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <EmptyState icon={<Database size={18} />} title="No custom assets" description="Assign custom assets to this portfolio from the Custom Assets page." />
+          )}
+        </Panel>
+
+        <Panel>
+          <h2 className="mb-4 text-sm font-semibold text-white">Allocation Chart</h2>
+          <div className="h-72">
+            {allocation.data?.length ? (
+              <ResponsiveContainer>
+                <PieChart>
+                  <Pie data={allocation.data} dataKey="currentValue" nameKey="symbol" innerRadius={58} outerRadius={95}>
+                    {allocation.data.map((_, index) => <Cell key={index} fill={accent[index % accent.length]} />)}
+                  </Pie>
+                  <Tooltip contentStyle={{ background: "#0a0a0a", border: "1px solid rgba(255,255,255,.08)", borderRadius: 12 }} />
+                </PieChart>
+              </ResponsiveContainer>
+            ) : (
+              <EmptyState icon={<BarChart3 size={18} />} title="Allocation unavailable" description="Allocation appears when analytics data is available." />
+            )}
+          </div>
+        </Panel>
+      </div>
+
+      {/* Market Assets full list */}
+      <Panel>
+        <h2 className="mb-4 text-sm font-semibold text-white">Market Assets</h2>
+        {marketAssetEntries.length ? (
+          <div className="space-y-3">
+            {marketAssetEntries.map((entry) => {
+              const ua = entry.userMarketAsset;
+              const asset = ua.marketAsset;
+              const qty = Number(ua.quantity);
+              const avgCost = Number(ua.averageCost);
+              const totalInvested = qty * avgCost;
+              return (
+                <div key={entry.userMarketAssetId} className="flex items-center justify-between rounded-xl border border-white/5 bg-white/2 p-4 transition hover:border-white/10">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-xl border border-[#b5b5f6]/20 bg-[#b5b5f6]/8 text-[10px] font-bold text-[#b5b5f6]">
+                      {asset.symbol.slice(0, 2)}
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-semibold text-white">{asset.symbol}</p>
+                        <span className="rounded-full border border-white/8 bg-white/3 px-2 py-0.5 text-[10px] uppercase text-neutral-400">{title(asset.assetType)}</span>
+                      </div>
+                      <p className="text-xs text-neutral-500 truncate max-w-48" title={asset.name}>{asset.name}</p>
+                      {(asset.exchange || asset.sector) && (
+                        <p className="text-[11px] text-neutral-600">
+                          {asset.exchange ?? ""}{asset.exchange && asset.sector ? " · " : ""}{asset.sector ?? ""}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm font-semibold text-[#b5b5f6]">{money(totalInvested, asset.currency)}</p>
+                    <p className="text-[11px] text-neutral-500">
+                      {qty.toLocaleString(undefined, { maximumFractionDigits: 4 })} × {money(avgCost, asset.currency)}
+                    </p>
+                    <p className="text-[11px] text-neutral-600">{asset.currency}</p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <EmptyState icon={<LineChart size={18} />} title="No market assets" description="Assign market assets to this portfolio from the Market Assets page." />
+        )}
+      </Panel>
+
+      {/* Edit Modal */}
+      {editOpen && portfolioListEntry ? (
+        <Modal title="Edit Portfolio" onClose={() => setEditOpen(false)}>
+          <PortfolioForm
+            initial={portfolioListEntry}
+            pending={update.isPending}
+            onSubmit={(formData) => update.mutate({
+              portfolioId: portfolioId,
+              data: { name: formData.name, description: formData.description || null, visibility: formData.visibility }
+            }, { onSuccess: () => { toast.success("Portfolio updated"); setEditOpen(false); } })}
+          />
+        </Modal>
+      ) : null}
     </div>
   );
 }

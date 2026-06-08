@@ -64,11 +64,6 @@ export function TopNav({ onMobileMenu }: { onMobileMenu: () => void }) {
         >
           <Bell size={15} />
         </button>
-        <div className="hidden text-right sm:block">
-          <p className="max-w-36 truncate text-xs font-medium text-neutral-300">{displayName}</p>
-          <p className="text-[10px] text-neutral-600">Authenticated</p>
-        </div>
-        <UserButton />
       </div>
     </header>
   );

@@ -6,9 +6,9 @@ import {
   TrendingUp,
   Wallet,
   BarChart3,
-  Sparkles,
 } from "lucide-react";
 import Link from "next/link";
+import Image from "next/image";
 import {Show,UserButton} from "@clerk/nextjs"
 
 export default function HomePage() {
@@ -27,8 +27,14 @@ export default function HomePage() {
       <nav className="sticky top-0 z-50 border-b border-white/5 bg-black/40 backdrop-blur-md">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
           <div className="flex items-center gap-2.5 group cursor-pointer">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-linear-to-br from-[#b5b5f6] to-[#f7bff4] shadow-[0_0_20px_rgba(247,191,244,0.2)] transition-transform duration-300 group-hover:scale-105">
-              <Sparkles className="h-3.5 w-3.5 text-black" />
+            <div className="flex h-8 w-8 items-center justify-center transition-transform duration-300 group-hover:scale-105">
+              <Image
+                src="/logo.webp"
+                alt="PixelFi logo"
+                width={80}
+                height={80}
+                className="h-6 w-6"
+              />
             </div>
             <span className="text-xl font-medium tracking-tight bg-linear-to-r from-white to-white/90 bg-clip-text text-transparent">
               PixelFi

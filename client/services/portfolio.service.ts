@@ -30,11 +30,21 @@ export interface Portfolio {
   visibility: "PRIVATE" | "PUBLIC";
   createdAt: string;
   updatedAt: string;
+  totalValue?: number;
   _count?: {
     customAssets: number;
     marketAssets: number;
   };
   marketAssets?: PortfolioMarketAssetEntry[];
+  customAssets?: {
+    id: string;
+    name: string;
+    category: string;
+    currentValue: number;
+    purchasePrice: number | null;
+    currency: string;
+    description: string | null;
+  }[];
 }
 
 export const getPortfolios = async (api: AxiosInstance): Promise<Portfolio[]> => {

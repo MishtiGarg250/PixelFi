@@ -13,7 +13,7 @@ const poppins = Poppins({
 
 export const metadata: Metadata = {
   title: "PixelFi",
-  description: "Wealth management webapp",
+  description: "AI Powered Personal Finance Dashboard",
 };
 
 export default function RootLayout({
