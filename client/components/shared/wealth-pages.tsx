@@ -55,7 +55,14 @@ import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { useAccounts } from "@/hooks/useAccount";
-import { useAllocation, useNetWorth, usePerformance } from "@/hooks/useAnalytics";
+import {
+  useAllocation,
+  useLatestMonthlyReport,
+  useNetWorth,
+  usePerformance,
+  useRunMonthlyAnalysis,
+  useSnapshotSeries,
+} from "@/hooks/useAnalytics";
 import { useCustomAssets, useMarketAssets, useUserMarketAssets } from "@/hooks/useAssets";
 import { useLiabilities } from "@/hooks/useLiabilities";
 import { usePortfolio, usePortfolios } from "@/hooks/usePortfolio";
@@ -2325,11 +2332,132 @@ export function AnalyticsPage() {
   const netWorth = useNetWorth();
   const allocation = useAllocation();
   const performance = usePerformance();
+  const snapshots = useSnapshotSeries("DAILY", 90);
+  const monthlyReport = useLatestMonthlyReport();
+  const runAnalysis = useRunMonthlyAnalysis();
   const areaData = (performance.data ?? []).map((item) => ({ symbol: item.symbol, invested: item.investedAmount, value: item.currentValue, pnl: item.pnl }));
+  const trendData = (snapshots.data ?? []).map((item) => ({
+    date: new Date(item.snapshotDate).toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+    netWorth: item.netWorth,
+    assets: item.totalAssets,
+    liabilities: item.totalLiabilities,
+    healthScore: item.healthScore,
+  }));
+  const latestSnapshot = snapshots.data?.[snapshots.data.length - 1];
+  const latestReport = monthlyReport.data;
+  const totalPnl = (performance.data ?? []).reduce((sum, item) => sum + item.pnl, 0);
+
   return (
     <div className="space-y-8">
-      <PageHeader title="Analytics" description="Professional net worth, allocation, performance, and PnL analysis." />
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-3"><StatCard label="Net Worth" value={money(netWorth.data?.totalNetWorth)} color="text-[#b5b5f6]" /><StatCard label="Positions" value={netWorth.data?.holdings.length ?? 0} /><StatCard label="Total PnL" value={money((performance.data ?? []).reduce((sum, item) => sum + item.pnl, 0))} color="text-[#f7bff4]" /></div>
+      <PageHeader
+        title="Analytics"
+        description="Daily wealth metrics, portfolio charts, and monthly AI recommendations."
+        action={
+          <PrimaryButton
+            disabled={runAnalysis.isPending}
+            onClick={() =>
+              runAnalysis.mutate(undefined, {
+                onSuccess: () => toast.success("Monthly analysis refreshed"),
+                onError: () => toast.error("Unable to refresh monthly analysis"),
+              })
+            }
+          >
+            {runAnalysis.isPending ? <Loader2 size={14} className="animate-spin" /> : <Shield size={14} />}
+            Run Analysis
+          </PrimaryButton>
+        }
+      />
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
+        <StatCard label="Net Worth" value={money(netWorth.data?.totalNetWorth)} color="text-[#b5b5f6]" />
+        <StatCard label="Health Score" value={latestSnapshot?.healthScore ?? "--"} sub="Latest daily snapshot" />
+        <StatCard label="Positions" value={netWorth.data?.holdings.length ?? 0} />
+        <StatCard label="Total PnL" value={money(totalPnl)} color={totalPnl >= 0 ? "text-emerald-300" : "text-red-300"} />
+      </div>
+
+      <Panel>
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <h2 className="text-sm font-semibold text-white">Daily Net Worth Trend</h2>
+          <span className="text-xs text-neutral-500">Last 90 days</span>
+        </div>
+        <div className="h-80">
+          {snapshots.isLoading ? (
+            <div className="h-full animate-pulse rounded-xl bg-white/3" />
+          ) : trendData.length ? (
+            <ResponsiveContainer>
+              <AreaChart data={trendData}>
+                <CartesianGrid stroke="rgba(255,255,255,.05)" vertical={false} />
+                <XAxis dataKey="date" stroke="#737373" fontSize={11} />
+                <YAxis stroke="#737373" fontSize={11} />
+                <Tooltip contentStyle={{ background: "#0a0a0a", border: "1px solid rgba(255,255,255,.08)", borderRadius: 12 }} />
+                <Area type="monotone" dataKey="netWorth" stroke="#b5b5f6" fill="#b5b5f6" fillOpacity={0.16} />
+              </AreaChart>
+            </ResponsiveContainer>
+          ) : (
+            <EmptyState icon={<LineChart size={18} />} title="No snapshot trend yet" description="Daily snapshots will build this trend automatically." />
+          )}
+        </div>
+      </Panel>
+
+      <div className="grid grid-cols-1 gap-5 xl:grid-cols-[1.2fr_.8fr]">
+        <Panel>
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <h2 className="text-sm font-semibold text-white">Monthly AI Report</h2>
+            {latestReport?.snapshot?.snapshotDate ? <span className="text-xs text-neutral-500">{date(latestReport.snapshot.snapshotDate)}</span> : null}
+          </div>
+          {monthlyReport.isLoading ? (
+            <div className="h-40 animate-pulse rounded-xl bg-white/3" />
+          ) : latestReport ? (
+            <div className="space-y-5">
+              <div className="rounded-xl border border-white/5 bg-white/2 p-4">
+                <div className="flex items-start gap-3">
+                  <div className="mt-0.5 flex h-8 w-8 items-center justify-center rounded-xl border border-[#b5b5f6]/20 bg-[#b5b5f6]/10 text-[#b5b5f6]">
+                    <CheckCircle2 size={16} />
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-white">Wealth summary</p>
+                    <p className="mt-1 text-sm leading-6 text-neutral-400">{latestReport.snapshot.summary ?? "Monthly analysis is ready, but no narrative summary was saved yet."}</p>
+                  </div>
+                </div>
+              </div>
+              <div className="grid gap-3 md:grid-cols-2">
+                {latestReport.insights.map((insight) => (
+                  <div key={insight.id} className="rounded-xl border border-white/5 bg-neutral-950/55 p-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="rounded-full border border-white/8 bg-white/3 px-2 py-0.5 text-[10px] font-medium uppercase text-neutral-400">{title(insight.type)}</span>
+                      <span className={cn("text-[10px] font-semibold uppercase", insight.severity === "HIGH" ? "text-red-300" : insight.severity === "MEDIUM" ? "text-amber-300" : "text-emerald-300")}>{insight.severity}</span>
+                    </div>
+                    <h3 className="mt-3 text-sm font-semibold text-white">{insight.title}</h3>
+                    <p className="mt-2 whitespace-pre-line text-xs leading-5 text-neutral-400">{insight.description}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <EmptyState icon={<Shield size={18} />} title="No monthly AI report" description="Run the analysis once, then monthly cron will refresh it automatically." />
+          )}
+        </Panel>
+        <Panel>
+          <h2 className="mb-4 text-sm font-semibold text-white">Snapshot Scores</h2>
+          <div className="space-y-4">
+            {[
+              { label: "Risk", value: latestSnapshot?.riskScore ?? 0, color: "#f7bff4" },
+              { label: "Diversification", value: latestSnapshot?.diversificationScore ?? 0, color: "#b5b5f6" },
+              { label: "Health", value: latestSnapshot?.healthScore ?? 0, color: "#a7f3d0" },
+            ].map((item) => (
+              <div key={item.label}>
+                <div className="mb-1 flex items-center justify-between text-xs">
+                  <span className="text-neutral-400">{item.label}</span>
+                  <span className="font-mono text-white">{item.value}/100</span>
+                </div>
+                <div className="h-2 overflow-hidden rounded-full bg-white/5">
+                  <div className="h-full rounded-full" style={{ width: `${Math.min(100, Math.max(0, item.value))}%`, backgroundColor: item.color }} />
+                </div>
+              </div>
+            ))}
+          </div>
+        </Panel>
+      </div>
+
       <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
         <Panel><h2 className="mb-4 text-sm font-semibold text-white">Allocation Breakdown</h2><div className="h-80"><ResponsiveContainer><PieChart><Pie data={allocation.data ?? []} dataKey="currentValue" nameKey="symbol" innerRadius={65} outerRadius={105}>{(allocation.data ?? []).map((_, index) => <Cell key={index} fill={accent[index % accent.length]} />)}</Pie><Tooltip contentStyle={{ background: "#0a0a0a", border: "1px solid rgba(255,255,255,.08)", borderRadius: 12 }} /></PieChart></ResponsiveContainer></div></Panel>
         <Panel><h2 className="mb-4 text-sm font-semibold text-white">Performance Analysis</h2><div className="h-80"><ResponsiveContainer><AreaChart data={areaData}><CartesianGrid stroke="rgba(255,255,255,.05)" vertical={false} /><XAxis dataKey="symbol" stroke="#737373" fontSize={11} /><YAxis stroke="#737373" fontSize={11} /><Tooltip contentStyle={{ background: "#0a0a0a", border: "1px solid rgba(255,255,255,.08)", borderRadius: 12 }} /><Area type="monotone" dataKey="value" stroke="#b5b5f6" fill="#b5b5f6" fillOpacity={0.16} /></AreaChart></ResponsiveContainer></div></Panel>
@@ -2870,4 +2998,4 @@ export function GoalsPage() {
       )}
     </div>
   );
-}
+}

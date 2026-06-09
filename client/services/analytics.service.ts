@@ -66,6 +66,48 @@ export interface DiversificationPayload {
   totalAssets: number;
 }
 
+export interface SnapshotSeriesItem {
+  id: string;
+  snapshotDate: string;
+  snapshotType: "DAILY" | "MONTHLY";
+  netWorth: number;
+  totalAssets: number;
+  totalLiabilities: number;
+  portfolioValue: number;
+  cashValue: number;
+  monthlyExpenses: number;
+  monthlyIncome: number;
+  savingsRate: number;
+  riskScore: number;
+  diversificationScore: number;
+  healthScore: number;
+  portfolioReturnPercent: number;
+  emergencyFundMonths: number;
+  debtToAssetRatio: number;
+  summary?: string | null;
+}
+
+export interface MonthlyInsight {
+  id: string;
+  type: string;
+  severity: "LOW" | "MEDIUM" | "HIGH";
+  title: string;
+  description: string;
+  createdAt: string;
+}
+
+export interface MonthlyReportPayload {
+  snapshot: SnapshotSeriesItem;
+  insights: MonthlyInsight[];
+}
+
+export interface AnalyticsOverviewPayload {
+  dashboard: DashboardPayload;
+  risk: RiskScorePayload;
+  diversification: DiversificationPayload;
+  latestReport: MonthlyReportPayload | null;
+}
+
 
 export const getNetWorth = async (
   api: AxiosInstance
@@ -116,4 +158,45 @@ export const getDiversification = async (
 
   return res.data
     .diversification as DiversificationPayload;
+};
+
+export const getAnalyticsOverview = async (
+  api: AxiosInstance
+): Promise<AnalyticsOverviewPayload> => {
+  const res = await api.get("/analytics/overview");
+
+  return res.data.overview as AnalyticsOverviewPayload;
+};
+
+export const getSnapshotSeries = async (
+  api: AxiosInstance,
+  type: "DAILY" | "MONTHLY" = "DAILY",
+  range = 90
+): Promise<SnapshotSeriesItem[]> => {
+  const res = await api.get("/analytics/snapshots", {
+    params: {
+      type,
+      range,
+    },
+  });
+
+  return res.data.snapshots as SnapshotSeriesItem[];
+};
+
+export const getLatestMonthlyReport = async (
+  api: AxiosInstance
+): Promise<MonthlyReportPayload | null> => {
+  const res = await api.get(
+    "/analytics/monthly-analysis/latest"
+  );
+
+  return res.data.report as MonthlyReportPayload | null;
+};
+
+export const runMonthlyAnalysis = async (
+  api: AxiosInstance
+): Promise<unknown> => {
+  const res = await api.post("/analytics/monthly-analysis/run");
+
+  return res.data.report;
 };
