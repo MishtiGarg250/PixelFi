@@ -12,6 +12,11 @@ import {
   getRiskScoreService,
   getDiversificationService,
 } from "../service/analytics.service.js";
+import {
+  getLatestMonthlyReport,
+  runMonthlyAnalysis,
+} from "../service/monthly-analysis.service.js";
+import prisma from "../lib/prisma.js";
 
 // Net worth is the total value of a user's financial assets minus their liabilities, providing a snapshot of their overall financial health at a specific point in time. It includes the value of investments, cash, and other assets, minus any debts or obligations.
 
@@ -236,3 +241,197 @@ export const getDiversification = async (req: Request,res: Response) => {
       
     }
   }
+
+export const getAnalyticsOverview = async (
+  req: Request,
+  res: Response
+) => {
+  try {
+    const { userId } = getAuth(req);
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "Unauthorized",
+      });
+    }
+
+    const [
+      dashboard,
+      risk,
+      diversification,
+      latestReport,
+    ] = await Promise.all([
+      getDashboardService(userId),
+      getRiskScoreService(userId),
+      getDiversificationService(userId),
+      getLatestMonthlyReport(userId),
+    ]);
+
+    return res.status(200).json({
+      success: true,
+      overview: {
+        dashboard,
+        risk,
+        diversification,
+        latestReport,
+      },
+    });
+  } catch (error) {
+    console.error(error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch analytics overview",
+    });
+  }
+};
+
+export const getSnapshotSeries = async (
+  req: Request,
+  res: Response
+) => {
+  try {
+    const { userId } = getAuth(req);
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "Unauthorized",
+      });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: {
+        clerkUserId: userId,
+      },
+    });
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    const snapshotType =
+      req.query.type === "MONTHLY" ? "MONTHLY" : "DAILY";
+    const range =
+      typeof req.query.range === "string"
+        ? Number(req.query.range)
+        : 90;
+    const startDate = new Date();
+    startDate.setDate(
+      startDate.getDate() - (Number.isFinite(range) ? range : 90)
+    );
+
+    const snapshots =
+      await prisma.financialSnapshot.findMany({
+        where: {
+          userId: user.id,
+          snapshotType,
+          snapshotDate: {
+            gte: startDate,
+          },
+        },
+        orderBy: {
+          snapshotDate: "asc",
+        },
+      });
+
+    return res.status(200).json({
+      success: true,
+      snapshots: snapshots.map((snapshot) => ({
+        id: snapshot.id,
+        snapshotDate: snapshot.snapshotDate,
+        snapshotType: snapshot.snapshotType,
+        netWorth: Number(snapshot.netWorth),
+        totalAssets: Number(snapshot.totalAssets),
+        totalLiabilities: Number(snapshot.totalLiabilities),
+        portfolioValue: Number(snapshot.portfolioValue),
+        cashValue: Number(snapshot.cashValue),
+        monthlyExpenses: Number(snapshot.monthlyExpenses),
+        monthlyIncome: Number(snapshot.monthlyIncome),
+        savingsRate: Number(snapshot.savingsRate),
+        riskScore: snapshot.riskScore,
+        diversificationScore: snapshot.diversificationScore,
+        healthScore: snapshot.healthScore,
+        portfolioReturnPercent: Number(
+          snapshot.portfolioReturnPercent
+        ),
+        emergencyFundMonths: Number(
+          snapshot.emergencyFundMonths
+        ),
+        debtToAssetRatio: Number(snapshot.debtToAssetRatio),
+        summary: snapshot.summary,
+      })),
+    });
+  } catch (error) {
+    console.error(error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch snapshots",
+    });
+  }
+};
+
+export const getLatestMonthlyAnalysis = async (
+  req: Request,
+  res: Response
+) => {
+  try {
+    const { userId } = getAuth(req);
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "Unauthorized",
+      });
+    }
+
+    const report = await getLatestMonthlyReport(userId);
+
+    return res.status(200).json({
+      success: true,
+      report,
+    });
+  } catch (error) {
+    console.error(error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch latest monthly analysis",
+    });
+  }
+};
+
+export const runMonthlyAnalysisNow = async (
+  req: Request,
+  res: Response
+) => {
+  try {
+    const { userId } = getAuth(req);
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "Unauthorized",
+      });
+    }
+
+    const report = await runMonthlyAnalysis(userId);
+
+    return res.status(200).json({
+      success: true,
+      report,
+    });
+  } catch (error) {
+    console.error(error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to run monthly analysis",
+    });
+  }
+};

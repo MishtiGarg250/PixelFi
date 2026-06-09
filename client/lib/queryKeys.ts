@@ -17,5 +17,9 @@ export const queryKeys = {
     netWorth: ["analytics", "netWorth"] as const,
     allocation: ["analytics", "allocation"] as const,
     performance: ["analytics", "performance"] as const,
+    overview: ["analytics", "overview"] as const,
+    snapshots: (type: string, range: number) =>
+      ["analytics", "snapshots", type, range] as const,
+    monthlyReport: ["analytics", "monthlyReport"] as const,
   },
 };

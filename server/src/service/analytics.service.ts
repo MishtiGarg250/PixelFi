@@ -8,6 +8,35 @@ const MARKET_PRICES: Record<string, number> = {
   ETH: 3500,
 };
 
+function getPriceErrorMessage(error: unknown) {
+  if (
+    typeof error === "object" &&
+    error !== null &&
+    "response" in error
+  ) {
+    const response = (
+      error as {
+        response?: {
+          status?: number;
+          data?: unknown;
+        };
+      }
+    ).response;
+
+    return `status ${response?.status ?? "unknown"}`;
+  }
+
+  return error instanceof Error
+    ? error.message
+    : "unknown error";
+}
+
+function logPriceFallback(symbol: string, error: unknown) {
+  console.warn(
+    `Failed to fetch price for ${symbol}; using average cost fallback (${getPriceErrorMessage(error)})`
+  );
+}
+
 async function resolveUser(clerkUserId: string) {
   const user = await prisma.user.findUnique({
     where: {
@@ -60,10 +89,7 @@ export const getNetWorthService = async (
       try {
         currentPrice = await getCurrentPrice(symbol);
       } catch (error) {
-        console.error(
-          `Failed to fetch price for ${symbol}`,
-          error
-        );
+        logPriceFallback(symbol, error);
       }
 
       const currentValue = quantity * currentPrice;
@@ -158,10 +184,7 @@ export const getAllocationService = async (
         currentPrice =
           await getCurrentPrice(symbol);
       } catch (error) {
-        console.error(
-          `Failed to fetch price for ${symbol}`,
-          error
-        );
+        logPriceFallback(symbol, error);
       }
 
       return {
@@ -245,10 +268,7 @@ export const getPerformanceService =
           currentPrice =
             await getCurrentPrice(symbol);
         } catch (error) {
-          console.error(
-            `Failed to fetch price for ${symbol}`,
-            error
-          );
+          logPriceFallback(symbol, error);
         }
 
         const currentValue =
