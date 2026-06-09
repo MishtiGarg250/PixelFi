@@ -5,12 +5,14 @@ import {
     createGoal,
     getUserGoals,
     updateGoal,
-    deleteGoal
+    deleteGoal,
+    addGoalContribution
 } from "../controllers/goal.controller.js";
 
 const router = express.Router();
 router.post("/", protect, createGoal);
 router.get("/", protect, getUserGoals);
 router.put("/:id", protect, updateGoal);
-router.delete("/:id", protect, deleteGoal); 
+router.delete("/:id", protect, deleteGoal);
+router.post("/:id/contributions", protect, addGoalContribution);
 export default router;

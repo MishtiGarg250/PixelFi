@@ -67,12 +67,13 @@ export const updateAccount = async (req: Request, res: Response) => {
     }
 
     const accountId = req.params.accountId as string;
-    const { currentBalance, name, brokerName } = req.body;
+    const { currentBalance, name, brokerName, emergencyFund } = req.body;
 
     const account = await updateAccountService(userId, accountId, {
       ...(currentBalance !== undefined && { currentBalance: Number(currentBalance) }),
       ...(name !== undefined && { name }),
       ...(brokerName !== undefined && { brokerName }),
+      ...(emergencyFund !== undefined && { emergencyFund: Number(emergencyFund) }),
     });
 
     return res.status(200).json({ success: true, account });

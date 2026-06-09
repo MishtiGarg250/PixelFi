@@ -6,6 +6,7 @@ interface CreateAccountInput {
   accountType: "BROKERAGE" | "BANK" | "CRYPTO";
   currency: string;
   currentBalance?: number;
+  emergencyFund?: number;
 }
 
 async function resolveUser(clerkUserId: string) {
@@ -28,6 +29,7 @@ export const createAccountService = async (
       accountType: data.accountType,
       currency: data.currency,
       currentBalance: data.currentBalance ?? 0,
+      emergencyFund: data.emergencyFund ?? 0,
     },
   });
 
@@ -63,7 +65,7 @@ export const deleteAccountService = async (
 export const updateAccountService = async (
   clerkUserId: string,
   accountId: string,
-  data: { currentBalance?: number; name?: string; brokerName?: string }
+  data: { currentBalance?: number; name?: string; brokerName?: string; emergencyFund?: number }
 ) => {
   const user = await resolveUser(clerkUserId);
 
@@ -79,6 +81,7 @@ export const updateAccountService = async (
       ...(data.name !== undefined && { name: data.name }),
       ...(data.brokerName !== undefined && { brokerName: data.brokerName }),
       ...(data.currentBalance !== undefined && { currentBalance: data.currentBalance }),
+      ...(data.emergencyFund !== undefined && { emergencyFund: data.emergencyFund }),
     },
   });
 };

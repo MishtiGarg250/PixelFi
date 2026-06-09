@@ -55,7 +55,7 @@ export function useAccounts() {
       data,
     }: {
       accountId: string;
-      data: { currentBalance?: number; name?: string; brokerName?: string };
+      data: { currentBalance?: number; name?: string; brokerName?: string; emergencyFund?: number };
     }) => {
       const api = await getApi();
       return updateAccount(api, accountId, data);

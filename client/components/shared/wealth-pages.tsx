@@ -30,6 +30,8 @@ import {
   Plus,
   Search,
   Shield,
+  ShieldCheck,
+  Target,
   Trash2,
   User,
   Wallet,
@@ -59,6 +61,7 @@ import { useLiabilities } from "@/hooks/useLiabilities";
 import { usePortfolio, usePortfolios } from "@/hooks/usePortfolio";
 import { useTransactions } from "@/hooks/useTransaction";
 import { useExpenses } from "@/hooks/useExpense";
+import { useGoals } from "@/hooks/useGoals";
 import { useUser } from "@/hooks/useUser";
 import type { Account } from "@/services/account.service";
 import type {
@@ -72,6 +75,7 @@ import type { Liability } from "@/services/liability.service";
 import type { Portfolio } from "@/services/portfolio.service";
 import type { Transaction, TransactionType } from "@/services/transaction.service";
 import type { Expense, CreateExpenseInput, ExpenseCategory } from "@/services/expense.service";
+import type { Goal, CreateGoalInput, UpdateGoalInput } from "@/services/goal.service";
 import SearchCommand from "./SearchCommand";
 
 const accent = ["#b5b5f6", "#f7bff4", "#d8c4ff", "#a7f3d0", "#93c5fd", "#fcd34d"];
@@ -1286,8 +1290,18 @@ export function AccountsPage() {
   const { accounts, create, remove, update } = useAccounts();
   const [createOpen, setCreateOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Account | null>(null);
-  const [editBalanceTarget, setEditBalanceTarget] = useState<Account | null>(null);
+  const [editTarget, setEditTarget] = useState<Account | null>(null);
+  const [editMode, setEditMode] = useState<"balance" | "emergency">("balance");
   const [balanceInput, setBalanceInput] = useState("");
+  const [emergencyInput, setEmergencyInput] = useState("");
+
+  // Emergency fund spend prompt state
+  const [spendPrompt, setSpendPrompt] = useState<{
+    account: Account;
+    shortfall: number;
+    amount: number;
+    onProceed: () => void;
+  } | null>(null);
 
   const totalBalance = useMemo(() => {
     if (!accounts.data) return null;
@@ -1298,6 +1312,7 @@ export function AccountsPage() {
     }
     return {
       grand: accounts.data.reduce((s, a) => s + Number(a.currentBalance ?? 0), 0),
+      totalEmergency: accounts.data.reduce((s, a) => s + Number(a.emergencyFund ?? 0), 0),
       byType,
     };
   }, [accounts.data]);
@@ -1312,6 +1327,18 @@ export function AccountsPage() {
     if (type === "BANK") return "text-emerald-400 bg-emerald-500/10 border-emerald-500/20";
     if (type === "CRYPTO") return "text-orange-400 bg-orange-500/10 border-orange-500/20";
     return "text-[#b5b5f6] bg-[#b5b5f6]/10 border-[#b5b5f6]/20";
+  }
+
+  function openEditBalance(account: Account) {
+    setEditTarget(account);
+    setEditMode("balance");
+    setBalanceInput(String(Number(account.currentBalance ?? 0)));
+  }
+
+  function openEditEmergency(account: Account) {
+    setEditTarget(account);
+    setEditMode("emergency");
+    setEmergencyInput(String(Number(account.emergencyFund ?? 0)));
   }
 
   return (
@@ -1343,10 +1370,10 @@ export function AccountsPage() {
             color="text-emerald-400"
           />
           <StatCard
-            label="Crypto"
-            value={money(totalBalance?.byType["CRYPTO"] ?? 0)}
-            icon={<Database size={14} />}
-            color="text-orange-400"
+            label="Emergency Funds"
+            value={money(totalBalance?.totalEmergency ?? 0)}
+            icon={<ShieldCheck size={14} />}
+            color="text-amber-400"
           />
         </div>
       )}
@@ -1355,6 +1382,7 @@ export function AccountsPage() {
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
           {accounts.data.map((account) => {
             const balance = Number(account.currentBalance ?? 0);
+            const emergency = Number(account.emergencyFund ?? 0);
             return (
               <Panel key={account.id} className="flex flex-col justify-between gap-5 hover:border-white/10 transition duration-300">
                 {/* Header */}
@@ -1374,12 +1402,31 @@ export function AccountsPage() {
                 </div>
 
                 {/* Balance */}
-                <div className="rounded-xl bg-white/3 border border-white/5 px-4 py-3">
-                  <p className="text-[11px] text-neutral-500 uppercase tracking-wider font-medium">Current Balance</p>
-                  <p className="mt-1 text-2xl font-bold tracking-tight text-white font-mono">
-                    {money(balance, account.currency)}
-                  </p>
-                  <p className="mt-0.5 text-[11px] text-neutral-600">{account.currency}</p>
+                <div className="space-y-2">
+                  <div className="rounded-xl bg-white/3 border border-white/5 px-4 py-3">
+                    <p className="text-[11px] text-neutral-500 uppercase tracking-wider font-medium">Current Balance</p>
+                    <p className="mt-1 text-2xl font-bold tracking-tight text-white font-mono">
+                      {money(balance, account.currency)}
+                    </p>
+                    <p className="mt-0.5 text-[11px] text-neutral-600">{account.currency}</p>
+                  </div>
+                  {/* Emergency Fund */}
+                  <div className="rounded-xl bg-amber-500/5 border border-amber-500/15 px-4 py-2.5 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <ShieldCheck size={13} className="text-amber-400" />
+                      <span className="text-[11px] text-amber-400/80 font-medium">Emergency Fund</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-semibold text-amber-300 font-mono">{money(emergency, account.currency)}</span>
+                      <button
+                        onClick={() => openEditEmergency(account)}
+                        className="rounded-lg p-1 text-amber-500/60 hover:text-amber-400 hover:bg-amber-500/10 transition"
+                        title="Edit emergency fund"
+                      >
+                        <Pencil size={11} />
+                      </button>
+                    </div>
+                  </div>
                 </div>
 
                 {/* Meta */}
@@ -1394,7 +1441,7 @@ export function AccountsPage() {
                     View Details <ArrowRight size={12} />
                   </Link>
                   <div className="flex gap-2">
-                    <GhostButton onClick={() => { setEditBalanceTarget(account); setBalanceInput(String(balance)); }}>
+                    <GhostButton onClick={() => openEditBalance(account)}>
                       <Pencil size={13} /> Edit
                     </GhostButton>
                     <GhostButton tone="danger" onClick={() => setDeleteTarget(account)}>
@@ -1424,22 +1471,34 @@ export function AccountsPage() {
         </Modal>
       ) : null}
 
-      {/* Edit Balance Modal */}
-      {editBalanceTarget ? (
+      {/* Edit Balance / Emergency Fund Modal */}
+      {editTarget ? (
         <Modal
-          title={`Edit Balance — ${editBalanceTarget.name}`}
-          description={`Update the current balance for this ${title(editBalanceTarget.accountType)} account (${editBalanceTarget.currency}).`}
-          onClose={() => setEditBalanceTarget(null)}
+          title={editMode === "balance" ? `Edit Balance — ${editTarget.name}` : `Edit Emergency Fund — ${editTarget.name}`}
+          description={
+            editMode === "balance"
+              ? `Update the current balance for this ${title(editTarget.accountType)} account (${editTarget.currency}).`
+              : `Set aside an emergency reserve for this account. This amount is kept separate from your active balance and is only suggested as a fallback when you're short on funds.`
+          }
+          onClose={() => setEditTarget(null)}
         >
           <div className="space-y-4">
-            <Field label={`Balance (${editBalanceTarget.currency})`}>
+            {editMode === "emergency" && (
+              <div className="flex items-start gap-3 rounded-xl border border-amber-500/20 bg-amber-500/5 p-3">
+                <ShieldCheck size={15} className="mt-0.5 shrink-0 text-amber-400" />
+                <p className="text-xs text-amber-300/80">
+                  Your emergency fund is <strong>not</strong> counted in your active balance. It will only be suggested when you attempt to record an expense that exceeds your current balance.
+                </p>
+              </div>
+            )}
+            <Field label={editMode === "balance" ? `Balance (${editTarget.currency})` : `Emergency Fund Amount (${editTarget.currency})`}>
               <input
                 type="number"
                 step="0.01"
                 min="0"
                 className={inputClass}
-                value={balanceInput}
-                onChange={(e) => setBalanceInput(e.target.value)}
+                value={editMode === "balance" ? balanceInput : emergencyInput}
+                onChange={(e) => editMode === "balance" ? setBalanceInput(e.target.value) : setEmergencyInput(e.target.value)}
                 placeholder="0.00"
               />
             </Field>
@@ -1448,19 +1507,59 @@ export function AccountsPage() {
               disabled={update.isPending}
               onClick={() =>
                 update.mutate(
-                  { accountId: editBalanceTarget.id, data: { currentBalance: Number(balanceInput) } },
+                  {
+                    accountId: editTarget.id,
+                    data: editMode === "balance"
+                      ? { currentBalance: Number(balanceInput) }
+                      : { emergencyFund: Number(emergencyInput) },
+                  },
                   {
                     onSuccess: () => {
-                      toast.success("Balance updated");
-                      setEditBalanceTarget(null);
+                      toast.success(editMode === "balance" ? "Balance updated" : "Emergency fund updated");
+                      setEditTarget(null);
                     },
                   }
                 )
               }
             >
               {update.isPending ? <Loader2 size={14} className="animate-spin" /> : null}
-              Save Balance
+              {editMode === "balance" ? "Save Balance" : "Save Emergency Fund"}
             </PrimaryButton>
+          </div>
+        </Modal>
+      ) : null}
+
+      {/* Emergency Fund Spend Prompt */}
+      {spendPrompt ? (
+        <Modal
+          title="Insufficient Balance"
+          description={`Your current balance is short by ${money(spendPrompt.shortfall, spendPrompt.account.currency)}. Would you like to use part of your emergency fund instead?`}
+          onClose={() => setSpendPrompt(null)}
+        >
+          <div className="space-y-4">
+            <div className="flex items-start gap-3 rounded-xl border border-amber-500/20 bg-amber-500/5 p-4">
+              <ShieldCheck size={16} className="mt-0.5 shrink-0 text-amber-400" />
+              <div>
+                <p className="text-sm font-medium text-amber-300">Emergency Fund Available</p>
+                <p className="mt-0.5 text-xs text-amber-400/70">
+                  {money(Number(spendPrompt.account.emergencyFund ?? 0), spendPrompt.account.currency)} available in reserve
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-3">
+              <GhostButton onClick={() => setSpendPrompt(null)} className="flex-1">
+                Cancel
+              </GhostButton>
+              <PrimaryButton
+                className="flex-1"
+                onClick={() => {
+                  spendPrompt.onProceed();
+                  setSpendPrompt(null);
+                }}
+              >
+                Use Emergency Fund
+              </PrimaryButton>
+            </div>
           </div>
         </Modal>
       ) : null}
@@ -1545,14 +1644,6 @@ export function AccountDetailPage({ accountId }: { accountId: string }) {
         <StatCard label="Total Withdrawals" value={money(stats.withdrawalsTotal, account?.currency)} color="text-red-400" />
         <StatCard label="Fees Paid" value={money(stats.totalFees, account?.currency)} color="text-neutral-400" />
       </div>
-
-      {/* Trade stats (only meaningful if BROKERAGE / CRYPTO) */}
-      {account && account.accountType !== "BANK" && (
-        <div className="grid grid-cols-2 gap-4">
-          <StatCard label="Buy Orders" value={stats.buys} color="text-emerald-400" />
-          <StatCard label="Sell Orders" value={stats.sells} color="text-red-400" />
-        </div>
-      )}
 
       {/* Transaction history */}
       <div className="space-y-3">
@@ -2402,3 +2493,381 @@ export function SettingsPage() {
     </div>
   );
 }
+
+// ─── Goals Page ────────────────────────────────────────────────────────────────
+
+const goalSchema = z.object({
+  title: z.string().min(1, "Title is required").max(120),
+  targetAmount: z.coerce.number().positive("Target must be greater than 0"),
+  targetDate: z.string().optional(),
+});
+
+function GoalProgressRing({ percent, size = 64, stroke = 5 }: { percent: number; size?: number; stroke?: number }) {
+  const r = (size - stroke * 2) / 2;
+  const circ = 2 * Math.PI * r;
+  const offset = circ - (Math.min(percent, 100) / 100) * circ;
+  const color = percent >= 100 ? "#a7f3d0" : percent >= 60 ? "#b5b5f6" : "#f7bff4";
+
+  return (
+    <svg width={size} height={size} className="shrink-0 -rotate-90">
+      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth={stroke} />
+      <circle
+        cx={size / 2}
+        cy={size / 2}
+        r={r}
+        fill="none"
+        stroke={color}
+        strokeWidth={stroke}
+        strokeDasharray={circ}
+        strokeDashoffset={offset}
+        strokeLinecap="round"
+        style={{ transition: "stroke-dashoffset 0.6s ease" }}
+      />
+    </svg>
+  );
+}
+
+export function GoalsPage() {
+  const { goals, create, update, remove, contribute } = useGoals();
+  const [createOpen, setCreateOpen] = useState(false);
+  const [editTarget, setEditTarget] = useState<Goal | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Goal | null>(null);
+  const [contributeTarget, setContributeTarget] = useState<Goal | null>(null);
+  const [contributionInput, setContributionInput] = useState("");
+
+  const createForm = useForm<z.infer<typeof goalSchema>>({
+    resolver: zodResolver(goalSchema) as any,
+    defaultValues: { title: "", targetAmount: 0, targetDate: "" },
+  });
+
+  const editForm = useForm<z.infer<typeof goalSchema>>({
+    resolver: zodResolver(goalSchema) as any,
+  });
+
+  function handleOpenEdit(goal: Goal) {
+    setEditTarget(goal);
+    editForm.reset({
+      title: goal.title,
+      targetAmount: Number(goal.targetAmount),
+      targetDate: goal.targetDate ? goal.targetDate.split("T")[0] : "",
+    });
+  }
+
+  const stats = useMemo(() => {
+    const list = goals.data ?? [];
+    const active = list.filter((g) => g.status === "ACTIVE").length;
+    const completed = list.filter((g) => g.status === "COMPLETED").length;
+    const totalTarget = list.reduce((s, g) => s + Number(g.targetAmount), 0);
+    const totalCurrent = list.reduce((s, g) => s + Number(g.currentAmount), 0);
+    return { active, completed, totalTarget, totalCurrent };
+  }, [goals.data]);
+
+  return (
+    <div className="space-y-8">
+      <PageHeader
+        title="Goals"
+        description="Track your financial milestones and log contributions toward each target."
+        action={
+          <PrimaryButton onClick={() => { createForm.reset(); setCreateOpen(true); }}>
+            <Plus size={14} /> New Goal
+          </PrimaryButton>
+        }
+      />
+
+      {/* Summary Stats */}
+      {!goals.isLoading && !goals.isError && (goals.data?.length ?? 0) > 0 && (
+        <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
+          <StatCard label="Active Goals" value={stats.active} icon={<Target size={14} />} color="text-[#b5b5f6]" />
+          <StatCard label="Completed" value={stats.completed} icon={<CheckCircle2 size={14} />} color="text-emerald-400" />
+          <StatCard label="Total Target" value={money(stats.totalTarget)} icon={<CircleDollarSign size={14} />} />
+          <StatCard label="Total Saved" value={money(stats.totalCurrent)} icon={<Wallet size={14} />} color="text-[#f7bff4]" />
+        </div>
+      )}
+
+      {/* Goals Grid */}
+      {goals.isError ? (
+        <ErrorState />
+      ) : goals.isLoading ? (
+        <SkeletonGrid />
+      ) : goals.data?.length ? (
+        <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
+          {goals.data.map((goal) => {
+            const target = Number(goal.targetAmount);
+            const current = Number(goal.currentAmount);
+            const pct = goal.progressPercent;
+            const isCompleted = goal.status === "COMPLETED";
+            const remaining = Math.max(target - current, 0);
+
+            return (
+              <Panel
+                key={goal.id}
+                className={cn(
+                  "flex flex-col gap-4 hover:border-white/10 transition duration-300",
+                  isCompleted && "border-emerald-500/20 bg-emerald-500/3"
+                )}
+              >
+                {/* Header */}
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h2 className="text-sm font-semibold text-white truncate">{goal.title}</h2>
+                      <span
+                        className={cn(
+                          "rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide border",
+                          isCompleted
+                            ? "text-emerald-400 bg-emerald-500/10 border-emerald-500/20"
+                            : "text-[#b5b5f6] bg-[#b5b5f6]/10 border-[#b5b5f6]/20"
+                        )}
+                      >
+                        {isCompleted ? "Completed" : "Active"}
+                      </span>
+                    </div>
+                    {goal.targetDate && (
+                      <p className="mt-1 flex items-center gap-1 text-[11px] text-neutral-500">
+                        <Clock size={10} />
+                        Target: {date(goal.targetDate)}
+                      </p>
+                    )}
+                  </div>
+                  {/* Progress Ring */}
+                  <div className="relative shrink-0">
+                    <GoalProgressRing percent={pct} />
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <span className={cn("text-[11px] font-bold tabular-nums", isCompleted ? "text-emerald-400" : "text-white")}>
+                        {pct >= 100 ? "✓" : `${Math.round(pct)}%`}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Progress Bar */}
+                <div>
+                  <div className="flex justify-between text-[11px] text-neutral-500 mb-1.5">
+                    <span className="font-medium text-white font-mono">{money(current)}</span>
+                    <span>of {money(target)}</span>
+                  </div>
+                  <div className="h-1.5 rounded-full bg-white/5 overflow-hidden">
+                    <div
+                      className={cn(
+                        "h-full rounded-full transition-all duration-700",
+                        isCompleted
+                          ? "bg-gradient-to-r from-emerald-400 to-emerald-300"
+                          : pct >= 60
+                          ? "bg-gradient-to-r from-[#b5b5f6] to-[#d8c4ff]"
+                          : "bg-gradient-to-r from-[#f7bff4] to-[#b5b5f6]"
+                      )}
+                      style={{ width: `${Math.min(pct, 100)}%` }}
+                    />
+                  </div>
+                  {!isCompleted && (
+                    <p className="mt-1 text-[11px] text-neutral-600">
+                      {money(remaining)} remaining
+                    </p>
+                  )}
+                </div>
+
+                {/* Recent Contributions */}
+                {goal.contributions.length > 0 && (
+                  <div className="space-y-1 rounded-xl border border-white/5 bg-white/2 px-3 py-2">
+                    <p className="text-[10px] font-medium uppercase tracking-wider text-neutral-600 mb-2">Recent</p>
+                    {goal.contributions.slice(0, 3).map((c) => (
+                      <div key={c.id} className="flex items-center justify-between">
+                        <span className="text-[11px] text-neutral-500">{date(c.contributedAt)}</span>
+                        <span className="text-[11px] font-semibold text-emerald-400 font-mono">+{money(Number(c.amount))}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Actions */}
+                <div className="flex items-center justify-between border-t border-white/5 pt-3">
+                  {!isCompleted ? (
+                    <PrimaryButton
+                      onClick={() => { setContributeTarget(goal); setContributionInput(""); }}
+                      className="text-xs px-3 py-1.5 h-auto"
+                    >
+                      <Plus size={12} /> Contribute
+                    </PrimaryButton>
+                  ) : (
+                    <span className="flex items-center gap-1 text-xs text-emerald-400 font-medium">
+                      <CheckCircle2 size={13} /> Goal reached!
+                    </span>
+                  )}
+                  <div className="flex gap-2">
+                    <GhostButton onClick={() => handleOpenEdit(goal)}>
+                      <Pencil size={13} />
+                    </GhostButton>
+                    <GhostButton tone="danger" onClick={() => setDeleteTarget(goal)}>
+                      <Trash2 size={13} />
+                    </GhostButton>
+                  </div>
+                </div>
+              </Panel>
+            );
+          })}
+        </div>
+      ) : (
+        <EmptyState
+          icon={<Target size={18} />}
+          title="No goals yet"
+          description="Create your first financial goal and track your progress toward it."
+        />
+      )}
+
+      {/* Create Goal Modal */}
+      {createOpen && (
+        <Modal title="New Goal" description="Set a new financial milestone to work toward." onClose={() => setCreateOpen(false)}>
+          <form
+            onSubmit={createForm.handleSubmit((data) =>
+              create.mutate(
+                { title: data.title, targetAmount: data.targetAmount, ...(data.targetDate ? { targetDate: data.targetDate } : {}) },
+                {
+                  onSuccess: () => {
+                    toast.success("Goal created!");
+                    setCreateOpen(false);
+                    createForm.reset();
+                  },
+                  onError: () => toast.error("Failed to create goal"),
+                }
+              )
+            )}
+            className="space-y-4"
+          >
+            <Field label="Goal Title" error={createForm.formState.errors.title?.message}>
+              <input className={inputClass} placeholder="e.g. Emergency Fund, New Laptop, Vacation…" {...createForm.register("title")} />
+            </Field>
+            <Field label="Target Amount (USD)" error={createForm.formState.errors.targetAmount?.message}>
+              <input type="number" step="0.01" min="1" className={inputClass} placeholder="10000" {...createForm.register("targetAmount")} />
+            </Field>
+            <Field label="Target Date (optional)" error={createForm.formState.errors.targetDate?.message}>
+              <input type="date" className={inputClass} {...createForm.register("targetDate")} />
+            </Field>
+            <PrimaryButton type="submit" disabled={create.isPending}>
+              {create.isPending ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
+              Create Goal
+            </PrimaryButton>
+          </form>
+        </Modal>
+      )}
+
+      {/* Edit Goal Modal */}
+      {editTarget && (
+        <Modal
+          title={`Edit Goal — ${editTarget.title}`}
+          description="Update your goal details."
+          onClose={() => setEditTarget(null)}
+        >
+          <form
+            onSubmit={editForm.handleSubmit((data) =>
+              update.mutate(
+                {
+                  id: editTarget.id,
+                  data: { title: data.title, targetAmount: data.targetAmount, ...(data.targetDate ? { targetDate: data.targetDate } : {}) },
+                },
+                {
+                  onSuccess: () => {
+                    toast.success("Goal updated!");
+                    setEditTarget(null);
+                  },
+                  onError: () => toast.error("Failed to update goal"),
+                }
+              )
+            )}
+            className="space-y-4"
+          >
+            <Field label="Goal Title" error={editForm.formState.errors.title?.message}>
+              <input className={inputClass} placeholder="Goal title" {...editForm.register("title")} />
+            </Field>
+            <Field label="Target Amount (USD)" error={editForm.formState.errors.targetAmount?.message}>
+              <input type="number" step="0.01" min="1" className={inputClass} {...editForm.register("targetAmount")} />
+            </Field>
+            <Field label="Target Date (optional)" error={editForm.formState.errors.targetDate?.message}>
+              <input type="date" className={inputClass} {...editForm.register("targetDate")} />
+            </Field>
+            <PrimaryButton type="submit" disabled={update.isPending}>
+              {update.isPending ? <Loader2 size={14} className="animate-spin" /> : null}
+              Save Changes
+            </PrimaryButton>
+          </form>
+        </Modal>
+      )}
+
+      {/* Contribute Modal */}
+      {contributeTarget && (
+        <Modal
+          title={`Add Contribution — ${contributeTarget.title}`}
+          description={`Current progress: ${money(Number(contributeTarget.currentAmount))} / ${money(Number(contributeTarget.targetAmount))} (${contributeTarget.progressPercent}%)`}
+          onClose={() => setContributeTarget(null)}
+        >
+          <div className="space-y-4">
+            {/* Visual progress preview */}
+            <div className="flex items-center gap-4 rounded-xl border border-white/5 bg-white/3 p-4">
+              <GoalProgressRing percent={contributeTarget.progressPercent} size={56} stroke={4} />
+              <div>
+                <p className="text-sm font-semibold text-white">{contributeTarget.title}</p>
+                <p className="mt-0.5 text-xs text-neutral-500">
+                  {money(Math.max(Number(contributeTarget.targetAmount) - Number(contributeTarget.currentAmount), 0))} remaining
+                </p>
+              </div>
+            </div>
+            <Field label="Contribution Amount (USD)">
+              <input
+                type="number"
+                step="0.01"
+                min="0.01"
+                className={inputClass}
+                placeholder="e.g. 500"
+                value={contributionInput}
+                onChange={(e) => setContributionInput(e.target.value)}
+              />
+            </Field>
+            <PrimaryButton
+              type="button"
+              disabled={contribute.isPending || !contributionInput || Number(contributionInput) <= 0}
+              onClick={() =>
+                contribute.mutate(
+                  { goalId: contributeTarget.id, amount: Number(contributionInput) },
+                  {
+                    onSuccess: () => {
+                      toast.success("Contribution added!");
+                      setContributeTarget(null);
+                    },
+                    onError: () => toast.error("Failed to add contribution"),
+                  }
+                )
+              }
+            >
+              {contribute.isPending ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
+              Add Contribution
+            </PrimaryButton>
+          </div>
+        </Modal>
+      )}
+
+      {/* Delete Goal Modal */}
+      {deleteTarget && (
+        <Modal
+          title="Delete Goal"
+          description={`Delete "${deleteTarget.title}"? All contributions will also be removed. This cannot be undone.`}
+          onClose={() => setDeleteTarget(null)}
+        >
+          <GhostButton
+            tone="danger"
+            disabled={remove.isPending}
+            onClick={() =>
+              remove.mutate(deleteTarget.id, {
+                onSuccess: () => {
+                  toast.success("Goal deleted");
+                  setDeleteTarget(null);
+                },
+                onError: () => toast.error("Failed to delete goal"),
+              })
+            }
+          >
+            {remove.isPending ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />} Delete Goal
+          </GhostButton>
+        </Modal>
+      )}
+    </div>
+  );
+}

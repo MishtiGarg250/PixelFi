@@ -5,8 +5,34 @@ import {
     createGoalService,
     getUserGoalService,
     updateGoalService,
-    deleteGoalService
+    deleteGoalService,
+    addGoalContributionService
 } from "../service/goal.service.js"
+
+export const addGoalContribution = async (
+    req: Request,
+    res: Response
+) => {
+    try {
+        const { userId } = getAuth(req);
+        if (!userId) {
+            return res.status(401).json({ message: "Unauthorized" });
+        }
+        const id = req.params.id as string;
+        if (!id) {
+            return res.status(400).json({ success: false, message: "Goal id is required" });
+        }
+        const { amount } = req.body;
+        if (!amount || Number(amount) <= 0) {
+            return res.status(400).json({ success: false, message: "Amount must be greater than 0" });
+        }
+        const goal = await addGoalContributionService(userId, id, { amount: Number(amount) });
+        return res.status(200).json({ success: true, data: goal });
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({ success: false, message: "Failed to add contribution" });
+    }
+};
 
 export const createGoal = async (
     req: Request,

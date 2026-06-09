@@ -15,6 +15,7 @@ import {
   LayoutDashboard,
   LineChart,
   Settings,
+  Target,
   Wallet,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -29,6 +30,7 @@ const links = [
   { label: "Transactions", href: "/transactions", icon: ArrowLeftRight },
   { label: "Liabilities", href: "/liabilities", icon: CircleDollarSign },
   { label: "Analytics", href: "/analytics", icon: BarChart3 },
+  { label: "Goals", href: "/goals", icon: Target },
   { label: "Settings", href: "/settings", icon: Settings },
 ];
 

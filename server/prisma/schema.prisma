@@ -41,6 +41,7 @@ model Account {
   updatedAt      DateTime      @updatedAt
   userId         String
   currentBalance Decimal?      @db.Decimal(18, 2)
+  emergencyFund  Decimal?      @db.Decimal(18, 2)
   user           User          @relation(fields: [userId], references: [id])
   expenses       Expense[]
   incomes        Income[]
