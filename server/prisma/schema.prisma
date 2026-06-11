@@ -8,29 +8,29 @@ datasource db {
 }
 
 model User {
-  id                 String              @id @default(cuid())
-  clerkUserId        String              @unique
-  email              String              @unique
-  firstName          String?
-  lastName           String?
-  imageUrl           String?
-  createdAt          DateTime            @default(now())
-  updatedAt          DateTime            @updatedAt
-  baseCurrency       String              @default("USD")
-  username           String?             @unique
-  insights               AIInsight[]
-  accounts               Account[]
-  customAssets           CustomAsset[]
-  expenses               Expense[]
-  financialSnapshots     FinancialSnapshot[]
-  goals                  Goal[]
-  incomes                Income[]
-  liabilities            Liability[]
-  portfolios             Portfolio[]
-  transactions           Transaction[]
-  marketAssets           UserMarketAsset[]
-  mlPredictions          MLPrediction[]
+  id                       String                    @id @default(cuid())
+  clerkUserId              String                    @unique
+  email                    String                    @unique
+  firstName                String?
+  lastName                 String?
+  imageUrl                 String?
+  createdAt                DateTime                  @default(now())
+  updatedAt                DateTime                  @updatedAt
+  baseCurrency             String                    @default("USD")
+  username                 String?                   @unique
+  insights                 AIInsight[]
+  accounts                 Account[]
+  customAssets             CustomAsset[]
+  expenses                 Expense[]
   expenseCategoryBaselines ExpenseCategoryBaseline[]
+  financialSnapshots       FinancialSnapshot[]
+  goals                    Goal[]
+  incomes                  Income[]
+  liabilities              Liability[]
+  mlPredictions            MLPrediction[]
+  portfolios               Portfolio[]
+  transactions             Transaction[]
+  marketAssets             UserMarketAsset[]
 }
 
 model Account {
@@ -270,23 +270,20 @@ model FinancialSnapshot {
   holdingCount           Int
   summary                String?
   createdAt              DateTime                  @default(now())
-
-  // ML-derived ratio fields
-  netWorthMoM            Decimal?                  @db.Decimal(10, 4) // month-over-month % change
-  netWorthVelocity       Decimal?                  @db.Decimal(10, 4) // 3-month rolling rate of NW change
-  expenseGrowthRate      Decimal?                  @db.Decimal(10, 4) // % increase in total expenses vs prior period
-  incomeGrowthRate       Decimal?                  @db.Decimal(10, 4) // % change in income vs prior period
-  liquidityRatio         Decimal?                  @db.Decimal(10, 4) // cashValue / monthlyExpenses
-  burnRate               Decimal?                  @db.Decimal(10, 4) // monthlyExpenses / totalAssets
-  investmentRate         Decimal?                  @db.Decimal(10, 4) // (income - expenses) / income
-  liabilityGrowthRate    Decimal?                  @db.Decimal(10, 4) // % change in total liabilities vs prior period
-  expenseVolatility      Decimal?                  @db.Decimal(10, 4) // std dev of monthly expenses over last 3 months
-  cashFlowNetPositive    Boolean?                  // monthlyIncome > monthlyExpenses
-
+  burnRate               Decimal?                  @db.Decimal(10, 4)
+  cashFlowNetPositive    Boolean?
+  expenseGrowthRate      Decimal?                  @db.Decimal(10, 4)
+  expenseVolatility      Decimal?                  @db.Decimal(10, 4)
+  incomeGrowthRate       Decimal?                  @db.Decimal(10, 4)
+  investmentRate         Decimal?                  @db.Decimal(10, 4)
+  liabilityGrowthRate    Decimal?                  @db.Decimal(10, 4)
+  liquidityRatio         Decimal?                  @db.Decimal(10, 4)
+  netWorthMoM            Decimal?                  @db.Decimal(10, 4)
+  netWorthVelocity       Decimal?                  @db.Decimal(10, 4)
   assetAllocations       AssetAllocationSnapshot[]
   expenseCategories      ExpenseCategorySnapshot[]
-  mlPredictions          MLPrediction[]
   user                   User                      @relation(fields: [userId], references: [id])
+  mlPredictions          MLPrediction[]
 
   @@unique([userId, snapshotDate, snapshotType])
   @@index([userId, snapshotDate])
