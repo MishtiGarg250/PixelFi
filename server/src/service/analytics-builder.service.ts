@@ -93,6 +93,8 @@ export async function buildAnalyticsForUser(
         diversification,
         goals,
         expenses,
+        accounts,
+        incomes,
     ] = await Promise.all([
         getNetWorthService(clerkUserId),
         getAllocationService(clerkUserId),
@@ -107,6 +109,22 @@ export async function buildAnalyticsForUser(
         }),
 
         prisma.expense.findMany({
+            where: {
+                userId: user.id,
+            },
+        }),
+
+        prisma.account.findMany({
+            where: {
+                userId: user.id,
+            },
+            select: {
+                currentBalance: true,
+                accountType: true,
+            },
+        }),
+
+        prisma.income.findMany({
             where: {
                 userId: user.id,
             },
@@ -204,11 +222,24 @@ export async function buildAnalyticsForUser(
             );
 
 
-    // task left of account balance
+    // Aggregate cash value from all bank/checking accounts
+    const cashValue = accounts.reduce(
+        (sum, account) =>
+            sum + Number(account.currentBalance ?? 0),
+        0
+    );
 
-    const cashValue = 0;
-
-    const monthlyIncome = 0;
+    // Sum current-month income records
+    const monthlyIncome = incomes
+        .filter(
+            (income) =>
+                income.receivedAt >= startOfMonth
+        )
+        .reduce(
+            (sum, income) =>
+                sum + Number(income.amount),
+            0
+        );
 
     const savingsRate =
         monthlyIncome === 0

@@ -1,0 +1,93 @@
+
+volumes:
+  ml-models: # Storage for trained ML models
+
+networks:
+  pixelfi-net:
+    driver: bridge # Connects containers in an isolated network, allowing them to communicate by service name (e.g., "server" can call "ml-service" directly).
+
+services:
+  server:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: pixelfi-server
+
+    env_file:
+      - ./server/.env.docker
+
+    ports:
+      - "5005:5005" # Server port
+
+    networks:
+      - pixelfi-net
+
+    depends_on:
+      ml-service:
+        condition: service_started
+
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:5005/health"]
+      interval: 30s
+      timeout: 10s     
+      retries: 3      
+      start_period: 15s 
+
+    restart: unless-stopped
+
+  ml-service:
+    build:
+      context: ./ml-service
+      dockerfile: Dockerfile
+    container_name: pixelfi-ml
+
+    env_file:
+      - ./ml-service/.env.docker
+
+    ports:
+      - "8000:8000"
+
+    volumes:
+      - ml-models:/app/artifacts
+
+    networks:
+      - pixelfi-net
+
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+    restart: unless-stopped
+
+  client:
+    build:
+      context: ./client
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: "pk_test_dmlhYmxlLXBlYWNvY2stMzIuY2xlcmsuYWNjb3VudHMuZGV2JA"
+        NEXT_PUBLIC_API_URL: "http://localhost:5005/api"
+        NEXT_PUBLIC_FINNHUB_API_KEY: "d7d7r7pr01qggoenabj0d7d7r7pr01qggoenabjg"
+    container_name: pixelfi-client
+
+    environment:
+      CLERK_SECRET_KEY: "sk_test_AG3QxMn2oGT1ugaQLyZPCDmSdEfGpJHobFkqHIfElk"
+      NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: "pk_test_dmlhYmxlLXBlYWNvY2stMzIuY2xlcmsuYWNjb3VudHMuZGV2JA"
+      NEXT_PUBLIC_API_URL: "http://localhost:5005/api"
+      FINNHUB_BASE_URL: "https://finnhub.io/api/v1"
+      NEXT_PUBLIC_FINNHUB_API_KEY: "d7d7r7pr01qggoenabj0d7d7r7pr01qggoenabjg"
+      PORT: "3000"
+      HOSTNAME: "0.0.0.0"
+
+    ports:
+      - "3000:3000"
+
+    networks:
+      - pixelfi-net
+
+    depends_on:
+      - server
+
+    restart: unless-stopped

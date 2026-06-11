@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends
 import pandas as pd
 from sqlalchemy import create_engine
 from src.database.connection import get_db_engine
@@ -7,9 +7,11 @@ from src.models.predict import predictor_instance
 from src.api.schemas import PredictionRequest, PredictionResponse
 from config.settings import settings
 
-app = FastAPI(title="Wealth Management ML Service", version="1.0.0")
+# Use APIRouter, not FastAPI(). The actual FastAPI app lives in src/main.py.
+# This router gets registered there via app.include_router(predictions.router).
+router = APIRouter()
 
-@app.post("/api/v1/predict-networth", response_model=PredictionResponse)
+@router.post("/predict-networth", response_model=PredictionResponse)
 def predict_net_worth(payload: PredictionRequest, engine=Depends(get_db_engine)):
     user_id = payload.userId
     
@@ -58,4 +60,4 @@ def predict_net_worth(payload: PredictionRequest, engine=Depends(get_db_engine))
         predictedNetWorth=round(predicted_val, 2),
         forecastHorizonMonths=settings.FORECAST_HORIZON,
         primaryGrowthDrivers=drivers
-    )
+    )

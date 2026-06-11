@@ -25,9 +25,11 @@ export const createAccount = async (
   api: AxiosInstance,
   data: {
     name: string;
-    brokerName: string;
+    brokerName?: string;
     accountType: AccountType;
     currency: string;
+    currentBalance?: number;
+    emergencyFund?: number;
   }
 ): Promise<Account> => {
   const res = await api.post("/accounts", data);

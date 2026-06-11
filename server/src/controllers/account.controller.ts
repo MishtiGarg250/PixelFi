@@ -17,7 +17,18 @@ export const createAccount = async (req: Request, res: Response) => {
 
     const validatedData = createAccountSchema.parse(req.body);
 
-    const account = await createAccountService(userId, validatedData);
+    const { name, brokerName, accountType, currency, currentBalance, emergencyFund } = validatedData;
+
+    const serviceInput: Parameters<typeof createAccountService>[1] = {
+      name,
+      accountType,
+      currency,
+      ...(brokerName !== undefined && { brokerName }),
+      ...(currentBalance !== undefined && { currentBalance }),
+      ...(emergencyFund !== undefined && { emergencyFund }),
+    };
+
+    const account = await createAccountService(userId, serviceInput);
 
     return res.status(201).json({ success: true, account });
   } catch (error) {

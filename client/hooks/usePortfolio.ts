@@ -39,7 +39,7 @@ export function usePortfolios() {
       data,
     }: {
       portfolioId: string;
-      data: { name?: string; description?: string | null };
+      data: { name?: string; description?: string | null; visibility?: "PRIVATE" | "PUBLIC" };
     }) => {
       const api = await getApi();
       return updatePortfolio(api, portfolioId, data);

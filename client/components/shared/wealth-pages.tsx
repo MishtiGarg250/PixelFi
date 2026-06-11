@@ -344,7 +344,7 @@ function AccountForm({ onSubmit, pending }: { onSubmit: (data: z.infer<typeof ac
 const portfolioSchema = z.object({
   name: z.string().min(2),
   description: z.string().optional(),
-  visibility: z.enum(["PRIVATE", "PUBLIC"]).default("PRIVATE"),
+  visibility: z.enum(["PRIVATE", "PUBLIC"]),
 });
 
 function PortfolioForm({

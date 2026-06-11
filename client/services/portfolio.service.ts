@@ -68,7 +68,7 @@ export const createPortfolio = async (
 export const updatePortfolio = async (
   api: AxiosInstance,
   portfolioId: string,
-  data: { name?: string; description?: string | null }
+  data: { name?: string; description?: string | null; visibility?: "PRIVATE" | "PUBLIC" }
 ): Promise<Portfolio> => {
   const res = await api.patch(`/portfolios/${portfolioId}`, data);
   return res.data.portfolio as Portfolio;

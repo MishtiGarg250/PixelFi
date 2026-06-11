@@ -18,17 +18,19 @@ model User {
   updatedAt          DateTime            @updatedAt
   baseCurrency       String              @default("USD")
   username           String?             @unique
-  insights           AIInsight[]
-  accounts           Account[]
-  customAssets       CustomAsset[]
-  expenses           Expense[]
-  financialSnapshots FinancialSnapshot[]
-  goals              Goal[]
-  incomes            Income[]
-  liabilities        Liability[]
-  portfolios         Portfolio[]
-  transactions       Transaction[]
-  marketAssets       UserMarketAsset[]
+  insights               AIInsight[]
+  accounts               Account[]
+  customAssets           CustomAsset[]
+  expenses               Expense[]
+  financialSnapshots     FinancialSnapshot[]
+  goals                  Goal[]
+  incomes                Income[]
+  liabilities            Liability[]
+  portfolios             Portfolio[]
+  transactions           Transaction[]
+  marketAssets           UserMarketAsset[]
+  mlPredictions          MLPrediction[]
+  expenseCategoryBaselines ExpenseCategoryBaseline[]
 }
 
 model Account {
@@ -268,8 +270,22 @@ model FinancialSnapshot {
   holdingCount           Int
   summary                String?
   createdAt              DateTime                  @default(now())
+
+  // ML-derived ratio fields
+  netWorthMoM            Decimal?                  @db.Decimal(10, 4) // month-over-month % change
+  netWorthVelocity       Decimal?                  @db.Decimal(10, 4) // 3-month rolling rate of NW change
+  expenseGrowthRate      Decimal?                  @db.Decimal(10, 4) // % increase in total expenses vs prior period
+  incomeGrowthRate       Decimal?                  @db.Decimal(10, 4) // % change in income vs prior period
+  liquidityRatio         Decimal?                  @db.Decimal(10, 4) // cashValue / monthlyExpenses
+  burnRate               Decimal?                  @db.Decimal(10, 4) // monthlyExpenses / totalAssets
+  investmentRate         Decimal?                  @db.Decimal(10, 4) // (income - expenses) / income
+  liabilityGrowthRate    Decimal?                  @db.Decimal(10, 4) // % change in total liabilities vs prior period
+  expenseVolatility      Decimal?                  @db.Decimal(10, 4) // std dev of monthly expenses over last 3 months
+  cashFlowNetPositive    Boolean?                  // monthlyIncome > monthlyExpenses
+
   assetAllocations       AssetAllocationSnapshot[]
   expenseCategories      ExpenseCategorySnapshot[]
+  mlPredictions          MLPrediction[]
   user                   User                      @relation(fields: [userId], references: [id])
 
   @@unique([userId, snapshotDate, snapshotType])
@@ -295,6 +311,34 @@ model AssetAllocationSnapshot {
   snapshot   FinancialSnapshot @relation(fields: [snapshotId], references: [id])
 
   @@index([snapshotId])
+}
+
+model ExpenseCategoryBaseline {
+  id           String          @id @default(cuid())
+  userId       String
+  category     ExpenseCategory
+  avgAmount    Decimal         @db.Decimal(18, 2)
+  stdDevAmount Decimal         @db.Decimal(18, 2)
+  updatedAt    DateTime        @updatedAt
+  user         User            @relation(fields: [userId], references: [id])
+
+  @@unique([userId, category])
+  @@index([userId])
+}
+
+model MLPrediction {
+  id              String             @id @default(cuid())
+  userId          String
+  modelType       MLModelType
+  predictionDate  DateTime
+  inputSnapshotId String?
+  resultJson      Json
+  confidence      Decimal?           @db.Decimal(5, 4)
+  createdAt       DateTime           @default(now())
+  inputSnapshot   FinancialSnapshot? @relation(fields: [inputSnapshotId], references: [id])
+  user            User               @relation(fields: [userId], references: [id])
+
+  @@index([userId, modelType, predictionDate])
 }
 
 model CustomAssetValuation {
@@ -375,6 +419,17 @@ enum InsightType {
   PERFORMANCE
   SAVINGS
   MARKET
+  ANOMALY
+  LIFESTYLE_CREEP
+  CASH_FLOW
+  FORECAST
+}
+
+enum MLModelType {
+  NET_WORTH_FORECAST
+  EXPENSE_ANOMALY
+  LIFESTYLE_CREEP
+  CASH_FLOW_FORECAST
 }
 
 enum SnapshotType {

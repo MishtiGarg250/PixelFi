@@ -8,24 +8,35 @@ export function startMonthlySnapshotCron() {
     async () => {
       console.log("[CRON] Monthly snapshot started");
 
-      try {
-        const users = await prisma.user.findMany({
-          select: {
-            clerkUserId: true,
-          },
-        });
+      const users = await prisma.user.findMany({
+        select: {
+          clerkUserId: true,
+        },
+      });
 
-        for (const user of users) {
+      let success = 0;
+      let failed = 0;
+
+      for (const user of users) {
+        try {
           await runMonthlyAnalysis(user.clerkUserId);
+          success++;
+        } catch (error) {
+          failed++;
+          console.error(
+            `[CRON] Monthly analysis failed for user ${user.clerkUserId}`,
+            error
+          );
         }
-
-        console.log("[CRON] Monthly analysis completed");
-      } catch (error) {
-        console.error("[CRON] Monthly analysis failed", error);
       }
+
+      console.log(
+        `[CRON] Monthly analysis completed — success: ${success}, failed: ${failed}`
+      );
     },
     {
       timezone: "UTC",
     }
   );
 }
+

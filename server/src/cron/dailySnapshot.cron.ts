@@ -8,24 +8,35 @@ export function startDailySnapshotCron() {
     async () => {
       console.log("[CRON] Daily snapshot started");
 
-      try {
-        const users = await prisma.user.findMany({
-          select: {
-            clerkUserId: true,
-          },
-        });
+      const users = await prisma.user.findMany({
+        select: {
+          clerkUserId: true,
+        },
+      });
 
-        for (const user of users) {
+      let success = 0;
+      let failed = 0;
+
+      for (const user of users) {
+        try {
           await generateDailySnapshot(user.clerkUserId);
+          success++;
+        } catch (error) {
+          failed++;
+          console.error(
+            `[CRON] Daily snapshot failed for user ${user.clerkUserId}`,
+            error
+          );
         }
-
-        console.log("[CRON] Daily snapshot completed");
-      } catch (error) {
-        console.error("[CRON] Daily snapshot failed", error);
       }
+
+      console.log(
+        `[CRON] Daily snapshot completed — success: ${success}, failed: ${failed}`
+      );
     },
     {
       timezone: "UTC",
     }
   );
 }
+

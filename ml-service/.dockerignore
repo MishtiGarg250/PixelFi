@@ -1,0 +1,43 @@
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.pycache
+
+# Virtual environments
+venv/
+.venv/
+env/
+
+# Jupyter notebooks
+*.ipynb
+.ipynb_checkpoints/
+
+# Model artifacts — mounted as a volume at runtime, not baked in
+artifacts/
+*.pkl
+*.json
+*.joblib
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Git
+.git/
+.gitignore
+
+# Editor
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test / coverage
+.pytest_cache/
+htmlcov/
+.coverage

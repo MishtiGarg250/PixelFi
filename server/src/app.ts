@@ -11,6 +11,7 @@ import transactionRoutes from "./routes/transaction.routes.js";
 import liabilityRoutes from "./routes/liability.routes.js";
 import expenseRoutes from "./routes/expense.routes.js";
 import goalRoutes from "./routes/goal.routes.js";
+import incomeRoutes from "./routes/income.routes.js";
 import { marketAssetRouter, customAssetRouter } from "./routes/asset.routes.js";
 
 const app = express();
@@ -41,6 +42,7 @@ app.use("/api/transactions", transactionRoutes);
 app.use("/api/liabilities", liabilityRoutes);
 app.use("/api/expenses", expenseRoutes);
 app.use("/api/goals", goalRoutes);
+app.use("/api/incomes", incomeRoutes);
 app.use("/api/assets/market", marketAssetRouter);
 app.use("/api/assets/custom", customAssetRouter);
 
