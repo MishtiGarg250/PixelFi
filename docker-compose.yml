@@ -14,7 +14,7 @@ services:
     container_name: pixelfi-server
 
     env_file:
-      - ./server/.env.docker
+      - ./server/.env
 
     ports:
       - "5005:5005" # Server port
@@ -42,7 +42,7 @@ services:
     container_name: pixelfi-ml
 
     env_file:
-      - ./ml-service/.env.docker
+      - ./ml-service/.env
 
     ports:
       - "8000:8000"
