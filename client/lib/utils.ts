@@ -108,10 +108,12 @@ export const getChangeColorClass = (changePercent?: number) => {
     return changePercent > 0 ? 'text-green-500' : 'text-red-500';
 };
 
-export const formatPrice = (price: number) => {
+import { globalBaseCurrency } from "@/hooks/useUser";
+
+export const formatPrice = (price: number, currency?: string) => {
     return new Intl.NumberFormat('en-US', {
         style: 'currency',
-        currency: 'USD',
+        currency: currency || globalBaseCurrency,
         minimumFractionDigits: 2,
     }).format(price);
 };

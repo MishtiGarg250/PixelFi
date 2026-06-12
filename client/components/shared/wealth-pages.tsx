@@ -93,10 +93,12 @@ const customCategories = ["REAL_ESTATE", "VEHICLE", "LUXURY_ITEM", "ART", "COLLE
 const marketAssetTypes = ["STOCK", "ETF", "CRYPTO", "BOND", "MUTUAL_FUND"] as const;
 const expenseCategories = ["FOOD", "RENT", "TRAVEL", "SHOPPING", "UTILITIES", "HEALTHCARE", "OTHER"] as const;
 
-function money(value?: number | null, currency = "USD") {
+import { globalBaseCurrency } from "@/hooks/useUser";
+
+function money(value?: number | null, currency?: string) {
   return new Intl.NumberFormat("en-US", {
     style: "currency",
-    currency,
+    currency: currency || globalBaseCurrency,
     maximumFractionDigits: 0,
   }).format(Number(value ?? 0));
 }
@@ -312,7 +314,7 @@ function AccountForm({ onSubmit, pending }: { onSubmit: (data: z.infer<typeof ac
       name: "",
       brokerName: "",
       accountType: "BROKERAGE",
-      currency: "USD",
+      currency: globalBaseCurrency,
     },
   });
 
@@ -408,8 +410,8 @@ function LiabilityForm({
       type: initial?.type ?? "OTHER",
       originalAmount: initial?.originalAmount ?? 0,
       outstanding: initial?.outstanding ?? 0,
-      interestRate: initial?.interestRate ?? undefined,
-      currency: initial?.currency ?? "USD",
+      interestRate: initial?.interestRate ?? 0,
+      currency: initial?.currency ?? globalBaseCurrency,
     },
   });
   return (
@@ -443,7 +445,7 @@ const marketAssetSchema = z.object({
 function MarketAssetForm({ onSubmit, pending }: { onSubmit: (data: z.infer<typeof marketAssetSchema>) => void; pending: boolean }) {
   const form = useForm<z.infer<typeof marketAssetSchema>>({
     resolver: zodResolver(marketAssetSchema),
-    defaultValues: { symbol: "", name: "", assetType: "STOCK", exchange: "", sector: "", currency: "USD" },
+    defaultValues: { symbol: "", name: "", assetType: "STOCK", exchange: "", sector: "", currency: globalBaseCurrency },
   });
   return (
     <form onSubmit={form.handleSubmit((data) => onSubmit({ ...data, symbol: data.symbol.toUpperCase(), currency: data.currency.toUpperCase() }))} className="space-y-4">
@@ -507,10 +509,10 @@ function TrackAssetForm({
 
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Quantity Owned" error={form.formState.errors.quantity?.message}>
-          <input className={inputClass} type="number" step="0.0001" {...form.register("quantity")} />
+          <input className={inputClass} type="number" step="0.0001" min="0" placeholder="0.0000" {...form.register("quantity")} />
         </Field>
         <Field label="Average Buy Price" error={form.formState.errors.averageCost?.message}>
-          <input className={inputClass} type="number" step="0.01" {...form.register("averageCost")} />
+          <input className={inputClass} type="number" step="0.01" min="0" placeholder="0.00" {...form.register("averageCost")} />
         </Field>
       </div>
 
@@ -559,7 +561,9 @@ function CustomAssetForm({
       description: initial?.description ?? "",
       category: initial?.category ?? "OTHER",
       currentValue: initial?.currentValue ?? 0,
-      currency: initial?.currency ?? "USD",
+      purchasePrice: initial?.purchasePrice ?? 0,
+      currency: initial?.currency ?? globalBaseCurrency,
+      portfolioId: initial?.portfolioId ?? undefined,
 
       ...(initial?.purchasePrice != null && {
         purchasePrice: initial.purchasePrice,
@@ -695,7 +699,9 @@ function SmartTransactionForm({
     defaultValues: {
       accountId: accounts[0]?.id ?? "",
       type: "BUY",
-      currency: accounts[0]?.currency ?? "USD",
+      quantity: 0,
+      price: 0,
+      currency: accounts[0]?.currency ?? globalBaseCurrency,
       executedAt: new Date().toISOString().slice(0, 10),
     },
   });
@@ -708,7 +714,7 @@ function SmartTransactionForm({
     resolver: zodResolver(expenseSchema) as any,
     defaultValues: {
       category: "OTHER",
-      currency: accounts[0]?.currency ?? "USD",
+      currency: accounts[0]?.currency ?? globalBaseCurrency,
       occurredAt: new Date().toISOString().slice(0, 10),
     },
   });
@@ -783,7 +789,7 @@ function SmartTransactionForm({
               <input className={inputClass} type="number" step="0.01" min="0.01" placeholder="0.00" {...expForm.register("amount")} />
             </Field>
             <Field label="Currency" error={expForm.formState.errors.currency?.message}>
-              <input className={inputClass} placeholder="USD" {...expForm.register("currency")} />
+              <input className={inputClass} placeholder={globalBaseCurrency} {...expForm.register("currency")} />
             </Field>
             <Field label="Date" error={expForm.formState.errors.occurredAt?.message}>
               <input className={inputClass} type="date" {...expForm.register("occurredAt")} />
@@ -866,7 +872,7 @@ function SmartTransactionForm({
             ) : null}
 
             <Field label="Currency" error={txForm.formState.errors.currency?.message}>
-              <input className={inputClass} placeholder="USD" {...txForm.register("currency")} />
+              <input className={inputClass} placeholder={globalBaseCurrency} {...txForm.register("currency")} />
             </Field>
             <Field label="Date" error={txForm.formState.errors.executedAt?.message}>
               <input className={inputClass} type="date" {...txForm.register("executedAt")} />
@@ -2864,7 +2870,7 @@ export function GoalsPage() {
             <Field label="Goal Title" error={createForm.formState.errors.title?.message}>
               <input className={inputClass} placeholder="e.g. Emergency Fund, New Laptop, Vacation…" {...createForm.register("title")} />
             </Field>
-            <Field label="Target Amount (USD)" error={createForm.formState.errors.targetAmount?.message}>
+            <Field label={`Target Amount (${globalBaseCurrency})`} error={createForm.formState.errors.targetAmount?.message}>
               <input type="number" step="0.01" min="1" className={inputClass} placeholder="10000" {...createForm.register("targetAmount")} />
             </Field>
             <Field label="Target Date (optional)" error={createForm.formState.errors.targetDate?.message}>
@@ -2906,7 +2912,7 @@ export function GoalsPage() {
             <Field label="Goal Title" error={editForm.formState.errors.title?.message}>
               <input className={inputClass} placeholder="Goal title" {...editForm.register("title")} />
             </Field>
-            <Field label="Target Amount (USD)" error={editForm.formState.errors.targetAmount?.message}>
+            <Field label={`Target Amount (${globalBaseCurrency})`} error={editForm.formState.errors.targetAmount?.message}>
               <input type="number" step="0.01" min="1" className={inputClass} {...editForm.register("targetAmount")} />
             </Field>
             <Field label="Target Date (optional)" error={editForm.formState.errors.targetDate?.message}>
@@ -2938,7 +2944,7 @@ export function GoalsPage() {
                 </p>
               </div>
             </div>
-            <Field label="Contribution Amount (USD)">
+            <Field label={`Contribution Amount (${globalBaseCurrency})`}>
               <input
                 type="number"
                 step="0.01"
