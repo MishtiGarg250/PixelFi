@@ -6,6 +6,7 @@ import{
     updateExpenseService,
     deleteExpenseService
 } from "../service/expense.service.js";
+import { producer } from "../config/kafka.js";
 
 export const getUserExpenses = async(req: Request, res: Response) => {
     try {
@@ -28,6 +29,17 @@ export const createExpense= async(req: Request, res: Response) => {
             return res.status(401).json({ message: "Unauthorized" });
         }
         const expense = await createExpenseService(userId, req.body);
+        
+        // Fire data payload event downstream immediately into Kafka 
+        try {
+            await producer.send({
+                topic: 'transaction.created',
+                messages: [{ value: JSON.stringify(expense) }],
+            });
+        } catch (kafkaError) {
+            console.error("Failed to send Kafka event:", kafkaError);
+        }
+
         return res.status(201).json(expense);
     } catch (error) {
         console.error("Error creating expense:", error);

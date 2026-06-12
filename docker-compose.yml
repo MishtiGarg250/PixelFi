@@ -16,6 +16,9 @@ services:
     env_file:
       - ./server/.env
 
+    environment:
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+
     ports:
       - "5005:5005" # Server port
 
@@ -24,6 +27,8 @@ services:
 
     depends_on:
       ml-service:
+        condition: service_started
+      kafka:
         condition: service_started
 
     healthcheck:
@@ -44,6 +49,9 @@ services:
     env_file:
       - ./ml-service/.env
 
+    environment:
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+
     ports:
       - "8000:8000"
 
@@ -53,6 +61,10 @@ services:
     networks:
       - pixelfi-net
 
+    depends_on:
+      kafka:
+        condition: service_started
+
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
       interval: 30s
@@ -61,6 +73,29 @@ services:
       start_period: 20s
 
     restart: unless-stopped
+
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: pixelfi-kafka
+    ports:
+      - "9092:9092"
+    networks:
+      - pixelfi-net
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: 'CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT'
+      KAFKA_ADVERTISED_LISTENERS: 'PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092'
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_PROCESS_ROLES: 'broker,controller'
+      KAFKA_CONTROLLER_QUORUM_VOTERS: '1@kafka:29093'
+      KAFKA_LISTENERS: 'PLAINTEXT://0.0.0.0:29092,CONTROLLER://0.0.0.0:29093,PLAINTEXT_HOST://0.0.0.0:9092'
+      KAFKA_INTER_BROKER_LISTENER_NAME: 'PLAINTEXT'
+      KAFKA_CONTROLLER_LISTENER_NAMES: 'CONTROLLER'
+      KAFKA_LOG_DIRS: '/tmp/kraft-combined-logs'
+      CLUSTER_ID: 'MkU3OEVBNTcwNTJENDM2Qk'
 
   client:
     build:

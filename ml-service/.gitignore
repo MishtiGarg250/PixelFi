@@ -23,20 +23,20 @@ ENV/
 # =========================
 .ipynb_checkpoints/
 
-# =========================
-# ML Models & Artifacts
-# =========================
-models/
-artifacts/
-checkpoints/
-*.pkl
-*.pickle
-*.joblib
-*.h5
-*.hdf5
-*.pt
-*.pth
-*.onnx
+# # =========================
+# # ML Models & Artifacts
+# # =========================
+# models/
+# artifacts/
+# checkpoints/
+# *.pkl
+# *.pickle
+# *.joblib
+# *.h5
+# *.hdf5
+# *.pt
+# *.pth
+# *.onnx
 
 # =========================
 # Data Files
