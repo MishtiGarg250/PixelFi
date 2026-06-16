@@ -5,6 +5,7 @@ import { UserButton } from "@clerk/nextjs";
 import { Bell, Menu, Search } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { useUser } from "@/hooks/useUser";
+import { NotificationBell } from "./notification-bell";
 
 const routeTitles: Record<string, string> = {
   "/dashboard": "Dashboard",
@@ -57,13 +58,7 @@ export function TopNav({ onMobileMenu }: { onMobileMenu: () => void }) {
             className="h-10 w-full rounded-full border border-white/5 bg-white/2 pl-9 pr-4 text-xs text-white outline-none transition placeholder:text-neutral-600 focus:border-white/10 focus:bg-white/[0.04]"
           />
         </div>
-        <button
-          type="button"
-          className="rounded-full border border-white/5 bg-white/2 p-2.5 text-neutral-500 transition hover:text-white"
-          aria-label="Notifications"
-        >
-          <Bell size={15} />
-        </button>
+        <NotificationBell />
       </div>
     </header>
   );

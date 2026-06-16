@@ -1,4 +1,5 @@
 import prisma from "../lib/prisma.js";
+import { sendGoalMilestoneEmail } from "./email.service.js";
 
 interface CreateGoalInput {
     title: string;
@@ -193,6 +194,46 @@ export const addGoalContributionService = async (
                             data.amount,
                     },
                 });
+
+            // Calculate milestone reached
+            const targetAmount = Number(goal.targetAmount);
+            const oldAmount = Number(goal.currentAmount);
+            const newAmount = oldAmount + data.amount;
+
+            if (targetAmount > 0) {
+                const oldProgress = (oldAmount / targetAmount) * 100;
+                const newProgress = (newAmount / targetAmount) * 100;
+
+                const milestones = [25, 50, 75, 100];
+                let crossedMilestone = null;
+
+                for (const milestone of milestones) {
+                    if (oldProgress < milestone && newProgress >= milestone) {
+                        crossedMilestone = milestone;
+                    }
+                }
+
+                if (crossedMilestone) {
+                    // Create Notification
+                    await tx.notification.create({
+                        data: {
+                            userId: user.id,
+                            title: `Goal Milestone Reached!`,
+                            message: `You have reached ${crossedMilestone}% of your goal "${goal.title}".`,
+                            type: "GOAL_MILESTONE"
+                        }
+                    });
+
+                    // Send Email
+                    // Do not await to avoid blocking the request
+                    sendGoalMilestoneEmail(
+                        user.email,
+                        user.firstName || user.username || 'User',
+                        goal.title,
+                        crossedMilestone
+                    );
+                }
+            }
 
             return updatedGoal;
         }

@@ -12,6 +12,7 @@ import liabilityRoutes from "./routes/liability.routes.js";
 import expenseRoutes from "./routes/expense.routes.js";
 import goalRoutes from "./routes/goal.routes.js";
 import incomeRoutes from "./routes/income.routes.js";
+import notificationRoutes from "./routes/notification.routes.js";
 import router from "./routes/insights.js";
 import { marketAssetRouter, customAssetRouter } from "./routes/asset.routes.js";
 
@@ -45,6 +46,7 @@ app.use("/api/liabilities", liabilityRoutes);
 app.use("/api/expenses", expenseRoutes);
 app.use("/api/goals", goalRoutes);
 app.use("/api/incomes", incomeRoutes);
+app.use("/api/notifications", notificationRoutes);
 app.use("/api/assets/market", marketAssetRouter);
 app.use("/api/assets/custom", customAssetRouter);
 
