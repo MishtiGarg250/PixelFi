@@ -263,10 +263,10 @@ model FinancialSnapshot {
   goalCurrentAmount      Decimal                   @db.Decimal(18, 2)
   totalInvested          Decimal                   @db.Decimal(18, 2)
   unrealizedPnL          Decimal                   @db.Decimal(18, 2)
-  portfolioReturnPercent Decimal                   @db.Decimal(8, 2)
-  emergencyFundMonths    Decimal                   @db.Decimal(5, 2)
-  debtToAssetRatio       Decimal                   @db.Decimal(8, 4)
-  largestHoldingPercent  Decimal                   @db.Decimal(5, 2)
+  portfolioReturnPercent Decimal                   @db.Decimal(10, 2)
+  emergencyFundMonths    Decimal                   @db.Decimal(10, 2)
+  debtToAssetRatio       Decimal                   @db.Decimal(10, 4)
+  largestHoldingPercent  Decimal                   @db.Decimal(10, 2)
   holdingCount           Int
   summary                String?
   createdAt              DateTime                  @default(now())

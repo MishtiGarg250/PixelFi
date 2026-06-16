@@ -12,6 +12,7 @@ import liabilityRoutes from "./routes/liability.routes.js";
 import expenseRoutes from "./routes/expense.routes.js";
 import goalRoutes from "./routes/goal.routes.js";
 import incomeRoutes from "./routes/income.routes.js";
+import router from "./routes/insights.js";
 import { marketAssetRouter, customAssetRouter } from "./routes/asset.routes.js";
 
 const app = express();
@@ -32,6 +33,7 @@ app.use(clerkMiddleware());
 app.get("/health", (req, res) => {
   res.json({ status: "ok" });
 });
+app.use('/api',router);
 
 app.use("/api/users", userRoutes);
 app.use("/api/accounts", accountRoutes);
@@ -46,4 +48,4 @@ app.use("/api/incomes", incomeRoutes);
 app.use("/api/assets/market", marketAssetRouter);
 app.use("/api/assets/custom", customAssetRouter);
 
-export default app;
+export default app;

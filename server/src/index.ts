@@ -3,7 +3,7 @@ import prisma from "./lib/prisma.js"
 import app from "./app.js";
 import { startCronJobs } from "./cron/index.js";
 import { connectKafka } from "./config/kafka.js";
-import { startAnomalyListener } from "./workers/anomalyListener.js";
+import { startFinancialInsightsConsumer } from "./workers/kafkaworker.js";
 
 dotenv.config();
 
@@ -22,5 +22,5 @@ app.listen(PORT, async () => {
   
   // Initialize communication channels
   await connectKafka();
-  await startAnomalyListener();
+  await startFinancialInsightsConsumer();
 });

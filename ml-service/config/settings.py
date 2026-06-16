@@ -13,8 +13,13 @@ class Settings(BaseSettings):
     # Kafka Properties
     KAFKA_BOOTSTRAP_SERVERS: str = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "kafka:29092")
     KAFKA_CONSUMER_GROUP_ANOMALY: str = "pixel-fi-anomaly-group"
+    
+    # 🛠️ FIXED: Added missing Pydantic variable to resolve the container crash
+    KAFKA_CONSUMER_GROUP_ML_ENGINES: str = os.getenv("KAFKA_CONSUMER_GROUP_ML_ENGINES", "pixel-fi-engines-group")
 
     class Config:
         env_file = ".env"
+        # Allows extra environment strings to safely pass through without crashing Pydantic
+        extra = "ignore" 
 
 settings = Settings()
