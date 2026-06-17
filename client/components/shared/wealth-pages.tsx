@@ -82,7 +82,7 @@ import type { Liability } from "@/services/liability.service";
 import type { Portfolio } from "@/services/portfolio.service";
 import type { Transaction, TransactionType } from "@/services/transaction.service";
 import type { Expense, CreateExpenseInput, ExpenseCategory } from "@/services/expense.service";
-import type { Goal, CreateGoalInput, UpdateGoalInput } from "@/services/goal.service";
+import type { Goal } from "@/services/goal.service";
 import SearchCommand from "./SearchCommand";
 
 const accent = ["#b5b5f6", "#f7bff4", "#d8c4ff", "#a7f3d0", "#93c5fd", "#fcd34d"];

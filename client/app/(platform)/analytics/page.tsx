@@ -1,4 +1,4 @@
-import { AnalyticsPage } from "@/components/shared/wealth-pages";
+import { AnalyticsPage } from "@/components/shared/AnalyticsPage";
 
 export default function Page() {
   return <AnalyticsPage />;

@@ -28,10 +28,10 @@ model User {
   incomes                  Income[]
   liabilities              Liability[]
   mlPredictions            MLPrediction[]
+  notifications            Notification[]
   portfolios               Portfolio[]
   transactions             Transaction[]
   marketAssets             UserMarketAsset[]
-  notifications            Notification[]
 }
 
 model Account {
@@ -359,6 +359,19 @@ model GoalContribution {
   @@index([goalId, contributedAt])
 }
 
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  title     String
+  message   String
+  read      Boolean  @default(false)
+  type      String
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+}
+
 enum MarketAssetType {
   STOCK
   ETF
@@ -455,17 +468,4 @@ enum IncomeSource {
   INTEREST
   RENTAL
   OTHER
-}
-
-model Notification {
-  id        String   @id @default(cuid())
-  userId    String
-  title     String
-  message   String
-  read      Boolean  @default(false)
-  type      String
-  createdAt DateTime @default(now())
-  user      User     @relation(fields: [userId], references: [id])
-
-  @@index([userId])
 }
