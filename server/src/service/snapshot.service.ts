@@ -1,5 +1,6 @@
 import prisma from "../lib/prisma.js";
 import { buildAnalyticsForUser } from "./analytics-builder.service.js";
+import { sendDailySnapshotEmail } from "./email.service.js";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -223,7 +224,7 @@ export async function generateDailySnapshot(
     cashValue: analytics.cashValue,
   });
 
-  return prisma.financialSnapshot.create({
+  const snapshot = await prisma.financialSnapshot.create({
     data: {
       userId: user.id,
       snapshotType: "DAILY",
@@ -253,6 +254,36 @@ export async function generateDailySnapshot(
       ...mlRatios,
     },
   });
+
+  // --- Notification + Email (fire-and-forget) ---
+  const dateLabel = startOfDay.toLocaleDateString("en-IN", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+
+  prisma.notification
+    .create({
+      data: {
+        userId: user.id,
+        title: "Daily Snapshot Ready",
+        message: `Your financial snapshot for ${dateLabel} is ready. Net Worth: ₹${analytics.netWorth.toLocaleString("en-IN", { maximumFractionDigits: 2 })}, Health Score: ${analytics.healthScore}/100.`,
+        type: "DAILY_SNAPSHOT",
+      },
+    })
+    .catch((err) =>
+      console.error("[Snapshot] Failed to create daily notification:", err)
+    );
+
+  sendDailySnapshotEmail(user.email, user.firstName || user.username || "User", {
+    netWorth: analytics.netWorth,
+    healthScore: analytics.healthScore,
+    totalAssets: analytics.totalAssets,
+    totalLiabilities: analytics.totalLiabilities,
+    date: dateLabel,
+  });
+
+  return snapshot;
 }
 
 export async function generateMonthlySnapshot(

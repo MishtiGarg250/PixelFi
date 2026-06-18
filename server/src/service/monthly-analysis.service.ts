@@ -3,6 +3,7 @@ import { buildAnalyticsForUser } from "./analytics-builder.service.js";
 import {generateMonthlySnapshot} from "./snapshot.service.js";
 import {getMonthlyMlAnalysis,type MonthlyMlInput} from "./ml-client.service.js";
 import { generateMonthlyLlmAnalysis} from "./llm-analysis.service.js";
+import { sendMonthlyReportEmail } from "./email.service.js";
 
 function toSnapshotData(snapshot: {
   netWorth: unknown;
@@ -173,6 +174,42 @@ export async function runMonthlyAnalysis(clerkUserId: string) {
       type: recommendation.category,
     })),
   });
+
+  // --- Notification + Email (fire-and-forget) ---
+  const monthLabel = snapshot.snapshotDate.toLocaleDateString("en-IN", {
+    year: "numeric",
+    month: "long",
+  });
+  const insightCount = llmOutput.recommendations.length;
+
+  prisma.notification
+    .create({
+      data: {
+        userId: user.id,
+        title: "Monthly Report Ready",
+        message: `Your monthly financial report for ${monthLabel} is ready. ${insightCount > 0 ? `${insightCount} AI insight${insightCount > 1 ? 's' : ''} generated.` : ''} Check your dashboard for the full analysis.`,
+        type: "MONTHLY_SNAPSHOT",
+      },
+    })
+    .catch((err) =>
+      console.error("[MonthlyAnalysis] Failed to create monthly notification:", err)
+    );
+
+  sendMonthlyReportEmail(
+    user.email,
+    user.firstName || user.username || "User",
+    {
+      month: monthLabel,
+      netWorth: snapshotData.netWorth,
+      monthlyIncome: snapshotData.monthlyIncome,
+      monthlyExpenses: snapshotData.monthlyExpenses,
+      savingsRate: snapshotData.savingsRate,
+      healthScore: snapshotData.healthScore,
+      netWorthMoM: (mlOutput as any)?.netWorthMoM ?? null,
+      insightCount,
+      summary: llmOutput.summary,
+    }
+  );
 
   return {
     snapshot: {
