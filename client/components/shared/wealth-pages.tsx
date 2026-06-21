@@ -1226,7 +1226,7 @@ export function DashboardPage() {
   const { transactions } = useTransactions();
   const liabilities = useLiabilities();
 
-  const totalLiabilities = useMemo(() => (liabilities.liabilities.data ?? []).reduce((sum, item) => sum + item.outstanding, 0), [liabilities.liabilities.data]);
+  const totalLiabilities = useMemo(() => (liabilities.liabilities.data ?? []).reduce((sum, item) => sum + Number(item.outstanding), 0), [liabilities.liabilities.data]);
   const totalAssets = Number(netWorth.data?.totalNetWorth ?? 0) + totalLiabilities;
   const pnlPercent = (performance.data ?? []).reduce((sum, item) => sum + item.pnlPercent, 0) / Math.max(performance.data?.length ?? 1, 1);
   const firstName = user.data?.firstName || user.data?.username || "Investor";
@@ -2320,7 +2320,7 @@ export function LiabilitiesPage() {
   const { liabilities, create, update, remove } = useLiabilities();
   const [open, setOpen] = useState(false);
   const [edit, setEdit] = useState<Liability | null>(null);
-  const total = (liabilities.data ?? []).reduce((sum, item) => sum + item.outstanding, 0);
+  const total = (liabilities.data ?? []).reduce((sum, item) => sum + Number(item.outstanding), 0);
   const highest = Math.max(0, ...(liabilities.data ?? []).map((item) => item.outstanding));
   const avgRate = (liabilities.data ?? []).reduce((sum, item) => sum + Number(item.interestRate ?? 0), 0) / Math.max(liabilities.data?.length ?? 1, 1);
   return (
