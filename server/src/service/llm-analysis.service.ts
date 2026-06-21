@@ -173,13 +173,23 @@ function buildPrompt(
     {
       role: "system",
       content:
-        "You are PixelFi's wealth analysis engine. Use only the provided facts. Return practical, cautious, educational wealth-management suggestions. Do not promise returns or provide tax/legal advice.",
+        "You are PixelFi's advanced wealth analysis engine. Your task is to generate actionable, personalized financial insights by synthesizing data from the ML service, applying financial snapshot analysis formulas, and delivering tailored recommendations. Use only the provided facts. Return practical, cautious, educational wealth-management suggestions. Do not promise returns or provide tax/legal advice.",
     },
     {
       role: "user",
       content: JSON.stringify({
-        factPack,
-        mlOutput,
+        context: {
+          mlServiceInsights: mlOutput,
+          historicalSnapshots: factPack,
+          snapshotAnalysisFormulas: {
+            healthScore: "Weighted score combining diversification (30%), risk (30%), debt management (20%), and emergency reserves (20%).",
+            savingsRate: "((monthlyIncome - monthlyExpenses) / monthlyIncome) * 100",
+            debtToAssetRatio: "totalLiabilities / totalAssets",
+            emergencyFundMonths: "cashValue / monthlyExpenses",
+            portfolioReturnPercent: "(unrealizedPnL / totalInvested) * 100",
+          }
+        },
+        task: "Generate a comprehensive monthly financial analysis based on the provided ML service insights, historical snapshots, and analysis formulas. Provide its insights clearly.",
         outputContract:
           "Return JSON with summary, healthLabel, keyDrivers, recommendations, chartAnnotations, and disclaimer.",
       }),

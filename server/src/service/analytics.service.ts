@@ -87,9 +87,15 @@ export const getNetWorthService = async (
       let currentPrice = averageCost;
 
       try {
-        currentPrice = await getCurrentPrice(symbol);
+        const fetchedPrice = await getCurrentPrice(symbol);
+        if (fetchedPrice && fetchedPrice > 0) {
+          currentPrice = fetchedPrice;
+        } else {
+          throw new Error("Finnhub returned 0 or invalid price");
+        }
       } catch (error) {
         logPriceFallback(symbol, error);
+        currentPrice = averageCost;
       }
 
       const currentValue = quantity * currentPrice;
@@ -148,8 +154,6 @@ export const getNetWorthService = async (
   };
 };
 
-
-
 export const getAllocationService = async (
   clerkUserId: string
 ) => {
@@ -181,10 +185,15 @@ export const getAllocationService = async (
       );
 
       try {
-        currentPrice =
-          await getCurrentPrice(symbol);
+        const fetchedPrice = await getCurrentPrice(symbol);
+        if (fetchedPrice && fetchedPrice > 0) {
+          currentPrice = fetchedPrice;
+        } else {
+          throw new Error("Finnhub returned 0 or invalid price");
+        }
       } catch (error) {
         logPriceFallback(symbol, error);
+        currentPrice = Number(asset.averageCost);
       }
 
       return {
@@ -234,8 +243,6 @@ export const getAllocationService = async (
   );
 };
 
-
-
 export const getPerformanceService =
   async (clerkUserId: string) => {
     const user = await resolveUser(clerkUserId);
@@ -265,10 +272,15 @@ export const getPerformanceService =
         let currentPrice = averageCost;
 
         try {
-          currentPrice =
-            await getCurrentPrice(symbol);
+          const fetchedPrice = await getCurrentPrice(symbol);
+          if (fetchedPrice && fetchedPrice > 0) {
+            currentPrice = fetchedPrice;
+          } else {
+            throw new Error("Finnhub returned 0 or invalid price");
+          }
         } catch (error) {
           logPriceFallback(symbol, error);
+          currentPrice = averageCost;
         }
 
         const currentValue =
@@ -297,8 +309,6 @@ export const getPerformanceService =
       })
     );
   };
-
-
 
 export const getDashboardService =
   async (clerkUserId: string) => {
@@ -350,7 +360,6 @@ export const getDashboardService =
     };
   };
 
-
 export const getRiskScoreService =
   async (clerkUserId: string) => {
     const allocation =
@@ -387,7 +396,6 @@ export const getRiskScoreService =
             : "LOW",
     };
   };
-
 
 export const getDiversificationService =
   async (clerkUserId: string) => {
