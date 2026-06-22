@@ -1,6 +1,6 @@
 import { consumer } from '../config/kafka.js';
 import prisma from '../lib/prisma.js';
-import { InsightSeverity, InsightType } from '../generated/prisma/index.js';
+import { InsightSeverity, InsightType } from '@prisma/client';
 import { sseManager } from '../utils/sseManager.js';
 
 // Dictionary mapping the exact Kafka topics to your Prisma InsightType Enums
