@@ -11,9 +11,6 @@ import {
   LineChart,
   Activity,
   CheckCircle2,
-  Github,
-  Twitter,
-  Linkedin
 } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
@@ -243,11 +240,7 @@ export default function HomePage() {
             <a href="#" className="hover:text-white transition-colors">Terms</a>
             <a href="#" className="hover:text-white transition-colors">Security</a>
           </div>
-          <div className="flex items-center gap-4 text-neutral-500">
-            <a href="#" className="hover:text-white transition-colors"><Twitter className="h-4 w-4" /></a>
-            <a href="#" className="hover:text-white transition-colors"><Github className="h-4 w-4" /></a>
-            <a href="#" className="hover:text-white transition-colors"><Linkedin className="h-4 w-4" /></a>
-          </div>
+          
         </div>
         <div className="mt-8 text-center text-xs text-neutral-600">
           &copy; {new Date().getFullYear()} PixelFi. All rights reserved.
