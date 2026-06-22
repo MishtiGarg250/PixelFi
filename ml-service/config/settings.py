@@ -12,6 +12,8 @@ class Settings(BaseSettings):
 
     # Kafka Properties
     KAFKA_BOOTSTRAP_SERVERS: str = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "kafka:29092")
+    KAFKA_SASL_USERNAME: str | None = os.getenv("KAFKA_SASL_USERNAME", None)
+    KAFKA_SASL_PASSWORD: str | None = os.getenv("KAFKA_SASL_PASSWORD", None)
     KAFKA_CONSUMER_GROUP_ANOMALY: str = "pixel-fi-anomaly-group"
     
     # 🛠️ FIXED: Added missing Pydantic variable to resolve the container crash

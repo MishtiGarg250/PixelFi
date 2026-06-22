@@ -28,6 +28,16 @@ def start_kafka_worker():
     }
     producer_conf = {'bootstrap.servers': settings.KAFKA_BOOTSTRAP_SERVERS}
 
+    if settings.KAFKA_SASL_USERNAME and settings.KAFKA_SASL_PASSWORD:
+        sasl_config = {
+            'security.protocol': 'SASL_SSL',
+            'sasl.mechanisms': 'SCRAM-SHA-256',
+            'sasl.username': settings.KAFKA_SASL_USERNAME,
+            'sasl.password': settings.KAFKA_SASL_PASSWORD
+        }
+        consumer_conf.update(sasl_config)
+        producer_conf.update(sasl_config)
+
     consumer = Consumer(consumer_conf)
     producer = Producer(producer_conf)
     

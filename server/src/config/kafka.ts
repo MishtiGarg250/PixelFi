@@ -1,9 +1,20 @@
 import { Kafka } from 'kafkajs';
 
-const kafka = new Kafka({
+const kafkaConfig: any = {
   clientId: 'pixel-fi-backend',
   brokers: [process.env.KAFKA_BOOTSTRAP_SERVERS || 'localhost:9092'],
-});
+};
+
+if (process.env.KAFKA_SASL_USERNAME && process.env.KAFKA_SASL_PASSWORD) {
+  kafkaConfig.ssl = true;
+  kafkaConfig.sasl = {
+    mechanism: 'scram-sha-256',
+    username: process.env.KAFKA_SASL_USERNAME,
+    password: process.env.KAFKA_SASL_PASSWORD,
+  };
+}
+
+const kafka = new Kafka(kafkaConfig);
 
 export const producer = kafka.producer();
 export const consumer = kafka.consumer({ groupId: 'pixel-fi-express-group' });
