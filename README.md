@@ -2,6 +2,9 @@
 
 PixelFi is an AI-powered wealth intelligence platform. It moves beyond traditional budgeting apps by utilizing an event-driven microservices architecture to provide real-time transaction tracking, anomaly detection, and predictive net worth forecasting.
 
+<img width="1000" height="500" alt="image" src="https://github.com/user-attachments/assets/90b22e2c-ee63-4394-bf43-6af4f216c835" />
+
+
 ## Architecture Overview
 
 PixelFi is built with a decoupled, high-performance tech stack:
