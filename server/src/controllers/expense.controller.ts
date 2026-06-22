@@ -33,7 +33,7 @@ export const createExpense= async(req: Request, res: Response) => {
         // Fire data payload event downstream immediately into Kafka 
         try {
             await producer.send({
-                topic: 'transaction.created',
+                topic: 'pixelfi.expense.created',
                 messages: [{ value: JSON.stringify(expense) }],
             });
         } catch (kafkaError) {
