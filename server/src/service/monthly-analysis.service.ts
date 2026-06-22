@@ -159,6 +159,9 @@ export async function runMonthlyAnalysis(clerkUserId: string) {
   await prisma.aIInsight.deleteMany({
     where: {
       userId: user.id,
+      type: {
+        in: ["RISK", "DIVERSIFICATION", "PERFORMANCE", "SAVINGS", "MARKET"]
+      },
       createdAt: {
         gte: periodStart(snapshot.snapshotDate),
       },

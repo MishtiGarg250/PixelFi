@@ -13,6 +13,7 @@ import {
   getSnapshotSeries,
   getLatestMonthlyAnalysis,
   runMonthlyAnalysisNow,
+  getLatestPrediction,
 } from "../controllers/analytics.controller.js";
 
 const router = express.Router();
@@ -27,5 +28,6 @@ router.get("/overview", protect, getAnalyticsOverview);
 router.get("/snapshots", protect, getSnapshotSeries);
 router.get("/monthly-analysis/latest",protect,getLatestMonthlyAnalysis);
 router.post("/monthly-analysis/run",protect,runMonthlyAnalysisNow);
+router.get("/prediction/latest", protect, getLatestPrediction);
 
 export default router;

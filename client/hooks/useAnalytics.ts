@@ -16,6 +16,8 @@ import {
   type AnalyticsOverviewPayload,
   type MonthlyReportPayload,
   type SnapshotSeriesItem,
+  type MLPredictionPayload,
+  getLatestPrediction,
 } from "@/services/analytics.service";
 import { queryKeys } from "@/lib/queryKeys";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -105,6 +107,17 @@ export function useRunMonthlyAnalysis() {
       queryClient.invalidateQueries({
         queryKey: queryKeys.analytics.monthlyReport,
       });
+    },
+  });
+}
+
+export function useLatestPrediction() {
+  const { getApi } = useApi();
+  return useQuery<MLPredictionPayload | null>({
+    queryKey: ["analytics", "prediction"],
+    queryFn: async () => {
+      const api = await getApi();
+      return getLatestPrediction(api);
     },
   });
 }

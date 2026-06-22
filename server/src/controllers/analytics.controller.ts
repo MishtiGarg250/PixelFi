@@ -435,3 +435,51 @@ export const runMonthlyAnalysisNow = async (
     });
   }
 };
+
+export const getLatestPrediction = async (
+  req: Request,
+  res: Response
+) => {
+  try {
+    const { userId } = getAuth(req);
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "Unauthorized",
+      });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { clerkUserId: userId },
+    });
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    const prediction = await prisma.mLPrediction.findFirst({
+      where: {
+        userId: user.id,
+        modelType: "NET_WORTH_FORECAST",
+      },
+      orderBy: {
+        predictionDate: "desc",
+      },
+    });
+
+    return res.status(200).json({
+      success: true,
+      prediction,
+    });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch prediction",
+    });
+  }
+};

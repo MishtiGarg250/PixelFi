@@ -28,6 +28,7 @@ import {
   usePerformance,
   useRunMonthlyAnalysis,
   useSnapshotSeries,
+  useLatestPrediction,
 } from "@/hooks/useAnalytics";
 import { AnalyticsInsightsFeed } from "@/components/shared/Insight"
 
@@ -155,8 +156,14 @@ export function AnalyticsPage() {
   const allocation = useAllocation();
   const performance = usePerformance();
   const snapshots = useSnapshotSeries("DAILY", 90);
+  const prediction = useLatestPrediction();
   const monthlyReport = useLatestMonthlyReport();
   const runAnalysis = useRunMonthlyAnalysis();
+
+  const forecastData = (prediction.data?.resultJson?.projections ?? []).map((p) => ({
+    date: new Date(p.date).toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+    netWorth: p.expectedNetWorth,
+  }));
 
   const areaData = (performance.data ?? []).map((item) => ({ symbol: item.symbol, invested: item.investedAmount, value: item.currentValue, pnl: item.pnl }));
   const trendData = (snapshots.data ?? []).map((item) => ({
@@ -197,29 +204,62 @@ export function AnalyticsPage() {
         <StatCard label="Total PnL" value={money(totalPnl)} color={totalPnl >= 0 ? "text-emerald-300" : "text-red-300"} />
       </div>
 
-      <Panel>
-        <div className="mb-4 flex items-center justify-between gap-3">
-          <h2 className="text-sm font-semibold text-white">Daily Net Worth Trend</h2>
-          <span className="text-xs text-neutral-500">Last 90 days</span>
-        </div>
-        <div className="h-80">
-          {snapshots.isLoading ? (
-            <div className="h-full animate-pulse rounded-xl bg-white/3" />
-          ) : trendData.length ? (
-            <ResponsiveContainer>
-              <AreaChart data={trendData}>
-                <CartesianGrid stroke="rgba(255,255,255,.05)" vertical={false} />
-                <XAxis dataKey="date" stroke="#737373" fontSize={11} />
-                <YAxis stroke="#737373" fontSize={11} />
-                <Tooltip contentStyle={{ background: "#0a0a0a", border: "1px solid rgba(255,255,255,.08)", borderRadius: 12 }} />
-                <Area type="monotone" dataKey="netWorth" stroke="#b5b5f6" fill="#b5b5f6" fillOpacity={0.16} />
-              </AreaChart>
-            </ResponsiveContainer>
-          ) : (
-            <EmptyState icon={<LineChart size={18} />} title="No snapshot trend yet" description="Daily snapshots will build this trend automatically." />
-          )}
-        </div>
-      </Panel>
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+        <Panel>
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <h2 className="text-sm font-semibold text-white">Daily Net Worth Trend</h2>
+            <span className="text-xs text-neutral-500">Last 90 days</span>
+          </div>
+          <div className="h-80">
+            {snapshots.isLoading ? (
+              <div className="h-full animate-pulse rounded-xl bg-white/3" />
+            ) : trendData.length ? (
+              <ResponsiveContainer>
+                <AreaChart data={trendData}>
+                  <CartesianGrid stroke="rgba(255,255,255,.05)" vertical={false} />
+                  <XAxis dataKey="date" stroke="#737373" fontSize={11} />
+                  <YAxis stroke="#737373" fontSize={11} />
+                  <Tooltip contentStyle={{ background: "#0a0a0a", border: "1px solid rgba(255,255,255,.08)", borderRadius: 12 }} />
+                  <Area type="monotone" dataKey="netWorth" stroke="#b5b5f6" fill="#b5b5f6" fillOpacity={0.16} />
+                </AreaChart>
+              </ResponsiveContainer>
+            ) : (
+              <EmptyState icon={<LineChart size={18} />} title="No snapshot trend yet" description="Daily snapshots will build this trend automatically." />
+            )}
+          </div>
+        </Panel>
+
+        <Panel>
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <h2 className="text-sm font-semibold text-white">AI Net Worth Forecast</h2>
+              {prediction.data?.confidence && (
+                <span className="rounded-full border border-white/8 bg-white/3 px-2 py-0.5 text-[10px] font-medium text-emerald-300">
+                  {Math.round(prediction.data.confidence * 100)}% Confidence
+                </span>
+              )}
+            </div>
+            <span className="text-xs text-neutral-500">Next 90 days</span>
+          </div>
+          <div className="h-80">
+            {prediction.isLoading ? (
+              <div className="h-full animate-pulse rounded-xl bg-white/3" />
+            ) : forecastData.length ? (
+              <ResponsiveContainer>
+                <AreaChart data={forecastData}>
+                  <CartesianGrid stroke="rgba(255,255,255,.05)" vertical={false} />
+                  <XAxis dataKey="date" stroke="#737373" fontSize={11} />
+                  <YAxis stroke="#737373" fontSize={11} />
+                  <Tooltip contentStyle={{ background: "#0a0a0a", border: "1px solid rgba(255,255,255,.08)", borderRadius: 12 }} />
+                  <Area type="monotone" dataKey="netWorth" stroke="#34d399" fill="#34d399" fillOpacity={0.16} />
+                </AreaChart>
+              </ResponsiveContainer>
+            ) : (
+              <EmptyState icon={<LineChart size={18} />} title="No forecast available" description="The ML service hasn't generated a projection yet." />
+            )}
+          </div>
+        </Panel>
+      </div>
 
       <div className="grid grid-cols-1 gap-5 xl:grid-cols-[1.2fr_.8fr]">
         <Panel>

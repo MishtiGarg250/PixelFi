@@ -20,7 +20,7 @@ const app = express();
 
 app.use(
   cors({
-    origin: process.env.FRONTEND_URI || "https://pixel-fi-one.vercel.app",
+    origin: process.env.FRONTEND_URI ,
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
     allowedHeaders: ["Content-Type", "Authorization"],

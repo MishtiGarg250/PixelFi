@@ -200,3 +200,25 @@ export const runMonthlyAnalysis = async (
 
   return res.data.report;
 };
+
+export interface MLPredictionPayload {
+  id: string;
+  userId: string;
+  modelType: string;
+  predictionDate: string;
+  inputSnapshotId: string;
+  resultJson: {
+    projections: { date: string; expectedNetWorth: number }[];
+    incomeGrowthRate: number;
+    expenseGrowthRate: number;
+  };
+  confidence: number | null;
+  createdAt: string;
+}
+
+export const getLatestPrediction = async (
+  api: AxiosInstance
+): Promise<MLPredictionPayload | null> => {
+  const res = await api.get("/analytics/prediction/latest");
+  return res.data.prediction as MLPredictionPayload | null;
+};
